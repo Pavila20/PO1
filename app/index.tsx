@@ -7,28 +7,37 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { signInWithGoogle } from "../src/auth/cognitoGoogle"; // <--- Import AWS Logic
 
 export default function Welcome() {
   const router = useRouter();
 
+  const handleGoogleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+      router.replace("/(tabs)/home");
+    } catch (error: any) {
+      if (error.message !== "Login cancelled/failed") {
+        Alert.alert("Google Sign-In Error", error.message);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* 1. Image Section with Gradient 
-        Matches CSS: linear-gradient(180deg, rgba(249, 233, 207, 1) 0%, ...)
-      */}
       <View style={styles.imageSection}>
         <LinearGradient
           colors={[
-            "rgba(249, 233, 207, 1)", // 0%
-            "rgba(234, 201, 149, 1)", // 38%
-            "rgba(196, 131, 65, 1)", // 75%
+            "rgba(249, 233, 207, 1)",
+            "rgba(234, 201, 149, 1)",
+            "rgba(196, 131, 65, 1)",
           ]}
           locations={[0, 0.38, 0.75]}
           style={styles.gradient}
         >
-          {/* Using the Coffee Beans image you uploaded */}
           <Image
             source={require("../assets/images/SignIn-Image.png")}
             style={styles.image}
@@ -37,12 +46,8 @@ export default function Welcome() {
         </LinearGradient>
       </View>
 
-      {/* 2. Content Section
-        Matches .div and .buttons classes
-      */}
       <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
         <ScrollView contentContainerStyle={styles.contentContainer}>
-          {/* Title & Subtitle */}
           <View style={styles.textWrapper}>
             <Text style={styles.title}>Welcome</Text>
             <Text style={styles.subtitle}>
@@ -50,9 +55,7 @@ export default function Welcome() {
             </Text>
           </View>
 
-          {/* Buttons Section */}
           <View style={styles.buttonsWrapper}>
-            {/* Sign In Button (Height 52px, Radius 45px) */}
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={() => router.push("/auth/login")}
@@ -63,18 +66,20 @@ export default function Welcome() {
 
             <Text style={styles.orText}>Or login with</Text>
 
-            {/* Google Button - Keeping styling consistent with your design system */}
-            <TouchableOpacity style={styles.googleButton} activeOpacity={0.8}>
+            {/* Google Button connected to AWS */}
+            <TouchableOpacity
+              style={styles.googleButton}
+              activeOpacity={0.8}
+              onPress={handleGoogleSignIn}
+            >
               <View style={styles.googleIconCircle}>
                 <Text style={styles.googleIconText}>G</Text>
               </View>
               <Text style={styles.primaryButtonText}>Continue with Google</Text>
             </TouchableOpacity>
 
-            {/* Divider Line */}
             <View style={styles.divider} />
 
-            {/* Terms Text */}
             <Text style={styles.footerText}>
               By using this app, you agree to our{" "}
               <Text style={styles.linkText}>Privacy policy</Text> and{" "}
@@ -87,14 +92,14 @@ export default function Welcome() {
   );
 }
 
+// ... Keep your existing styles unchanged ...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
-  // --- Image Section ---
   imageSection: {
-    height: "55%", // Matches approx 478px / 874px
+    height: "55%",
     width: "100%",
     position: "absolute",
     top: 0,
@@ -107,12 +112,8 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-    // CSS had mix-blend-mode: multiply.
-    // On RN, 'overlay' or just opacity sometimes works, but default cover is safest.
     opacity: 0.8,
   },
-
-  // --- Content Section ---
   safeArea: {
     flex: 1,
     justifyContent: "flex-end",
@@ -126,53 +127,51 @@ const styles = StyleSheet.create({
   textWrapper: {
     alignItems: "center",
     paddingHorizontal: 34,
-    marginBottom: 29, // Matches gap: 29px
+    marginBottom: 29,
   },
   title: {
-    fontFamily: "serif", // Matches "Domine"
+    fontFamily: "serif",
     fontSize: 25,
     fontWeight: "700",
-    color: "#0F0F0F", // var(--primitives-base-black)
+    color: "#0F0F0F",
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#7E7E7E", // var(--primitives-grey-700)
+    color: "#7E7E7E",
     textAlign: "center",
     lineHeight: 22,
     maxWidth: 300,
   },
-
-  // --- Buttons ---
   buttonsWrapper: {
     paddingHorizontal: 34,
     alignItems: "center",
-    gap: 16, // Matches CSS gap: 16px
+    gap: 16,
   },
   primaryButton: {
     width: "100%",
-    height: 52, // Matches CSS height: 52px
+    height: 52,
     borderRadius: 45,
-    backgroundColor: "#0F0F0F", // var(--primitives-base-black)
+    backgroundColor: "#0F0F0F",
     justifyContent: "center",
     alignItems: "center",
   },
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600", // Medium/SemiBold
+    fontWeight: "600",
   },
   orText: {
     fontSize: 12,
-    color: "#6C7278", // var(--mode-grey)
+    color: "#6C7278",
     marginVertical: 4,
   },
   googleButton: {
     width: "100%",
     height: 52,
     borderRadius: 45,
-    backgroundColor: "#C5281B", // Keeping the red from your previous design
+    backgroundColor: "#C5281B",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -191,8 +190,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-
-  // --- Footer ---
   divider: {
     height: 1,
     width: "100%",

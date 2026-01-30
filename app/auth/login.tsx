@@ -1,10 +1,9 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Checkbox from "expo-checkbox";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { signInWithEmailAndPassword } from "firebase/auth";
 import { ChevronLeft, Eye, EyeOff } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActivityIndicator,
   Alert,
@@ -16,9 +15,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth } from "../../config/firebase";
+import { signInEmailPassword } from "../../src/auth/emailPassword"; // <--- AWS Import
+import { signInWithGoogle } from "../../src/auth/cognitoGoogle"; // <--- AWS Import
 
-const { width, height } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
 
 export default function Login() {
   const router = useRouter();
@@ -52,7 +52,8 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // AWS Email/Password Sign In
+      await signInEmailPassword(email, password);
 
       if (rememberMe) {
         await AsyncStorage.setItem("remembered_email", email);
@@ -62,17 +63,36 @@ export default function Login() {
       router.replace("/(tabs)/home");
     } catch (error: any) {
       let msg = error.message;
-      if (error.code === "auth/invalid-credential")
-        msg = "Invalid email or password.";
-      Alert.alert("Login Failed", msg);
+      if (msg.toLowerCase().includes("not confirmed")) {
+        Alert.alert(
+          "Account Not Confirmed",
+          "Please check your email for the confirmation code.",
+        );
+        // Optional: Navigate to confirmation screen if you have one separate
+      } else {
+        Alert.alert("Login Failed", msg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGoogle = async () => {
+    try {
+      // AWS Google Sign In
+      await signInWithGoogle();
+      router.replace("/(tabs)/home");
+    } catch (error: any) {
+      // Ignore cancel errors, alert others
+      if (error.message !== "Login cancelled/failed") {
+        Alert.alert("Google Sign-In Error", error.message);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* --- BACKGROUND BLOBS (Larger & Smoother) --- */}
+      {/* --- BACKGROUND BLOBS --- */}
 
       {/* Top Left Ellipse */}
       <LinearGradient
@@ -187,7 +207,12 @@ export default function Login() {
                 <View style={styles.line} />
               </View>
 
-              <TouchableOpacity style={styles.googleButton} activeOpacity={0.8}>
+              {/* Google Button */}
+              <TouchableOpacity
+                style={styles.googleButton}
+                activeOpacity={0.8}
+                onPress={handleGoogle}
+              >
                 <View style={styles.googleIconPlaceholder}>
                   <Text style={{ color: "#C5281B", fontWeight: "bold" }}>
                     G
@@ -221,8 +246,8 @@ const styles = StyleSheet.create({
   // --- Adjusted Gradient Sizes ---
   ellipseTop: {
     position: "absolute",
-    width: 670, // Increased from 582
-    height: 790, // Increased from 582
+    width: 670,
+    height: 790,
     left: -200,
     top: -310,
     borderRadius: 400,
@@ -230,10 +255,10 @@ const styles = StyleSheet.create({
   },
   ellipseBottom: {
     position: "absolute",
-    width: 900, // Increased from 934
+    width: 900,
     height: 950,
     right: -400,
-    top: height * 0.5, // Position relative to screen height
+    top: height * 0.5,
     borderRadius: 500,
     opacity: 0.8,
   },

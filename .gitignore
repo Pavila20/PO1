@@ -42,5 +42,5 @@ app-example
 /ios
 /android
 
-# firebase API keys
+# AWS API keys
 .env

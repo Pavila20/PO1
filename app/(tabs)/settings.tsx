@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import { signOut } from "firebase/auth";
 import {
   Alert,
   ScrollView,
@@ -10,8 +9,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth } from "../../config/firebase";
 import { useTheme } from "../../context/ThemeContext";
+import { signOutLocal } from "../../src/auth/session"; // AWS
 
 export default function SettingsTab() {
   const router = useRouter();
@@ -19,13 +18,14 @@ export default function SettingsTab() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOutLocal();
       router.replace("/"); // Go back to Welcome screen
     } catch (error: any) {
       Alert.alert("Error", error.message);
     }
   };
 
+  // ... rest of the file remains exactly the same ...
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   logoutText: {
-    color: "#FF3B30", // Standard iOS destructive red
+    color: "#FF3B30",
     fontSize: 16,
     fontWeight: "bold",
   },

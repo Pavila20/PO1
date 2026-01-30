@@ -1,6 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   Calendar,
   ChevronDown,
@@ -21,13 +20,22 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth } from "../../config/firebase";
+import {
+  signUpEmailPassword,
+  confirmSignUp,
+} from "../../src/auth/emailPassword"; // AWS
 
 const { width, height } = Dimensions.get("window");
 
 export default function SignUp() {
   const router = useRouter();
 
+  // State
+  const [step, setStep] = useState<"signup" | "confirm">("signup");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Form Data
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -36,21 +44,43 @@ export default function SignUp() {
     phone: "",
     password: "",
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+
+  // Confirmation Code
+  const [code, setCode] = useState("");
 
   const handleRegister = async () => {
-    if (!form.email || !form.password || !form.firstName || !form.lastName) {
+    if (!form.email || !form.password || !form.firstName) {
       Alert.alert("Error", "Please fill in all required fields.");
       return;
     }
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, form.email, form.password);
-      // Here you would typically save the extra user data (name, phone, dob) to Firestore
-      router.replace("/(tabs)/home");
+      // Pass Name as extra attribute if needed
+      await signUpEmailPassword(form.email, form.password, form.firstName);
+      setStep("confirm"); // Move to confirmation step
+      Alert.alert(
+        "Success",
+        "Account created! Please check your email for the code.",
+      );
     } catch (error: any) {
       Alert.alert("Registration Failed", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!code) {
+      Alert.alert("Error", "Please enter the code sent to your email.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await confirmSignUp(form.email, code);
+      Alert.alert("Success", "Email verified! Logging you in...");
+      router.replace("/(tabs)/home");
+    } catch (error: any) {
+      Alert.alert("Confirmation Failed", error.message);
     } finally {
       setLoading(false);
     }
@@ -59,25 +89,23 @@ export default function SignUp() {
   return (
     <View style={styles.container}>
       {/* --- BACKGROUND SHAPES --- */}
-
-      {/* 1. The White Curve (Centered) */}
       <View style={styles.whiteCurveContainer}>
         <View style={styles.whiteCurve} />
       </View>
 
-      {/* 2. The Gold Gradient Overlay */}
       <LinearGradient
         colors={["transparent", "rgba(162, 93, 23, 0.3)"]}
         style={styles.goldOverlay}
         pointerEvents="none"
       />
 
-      {/* --- MAIN CONTENT --- */}
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() =>
+              step === "confirm" ? setStep("signup") : router.back()
+            }
           >
             <ChevronLeft size={28} color="#111827" />
           </TouchableOpacity>
@@ -87,128 +115,117 @@ export default function SignUp() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Floating Card */}
           <View style={styles.card}>
             {/* Header */}
             <View style={styles.textWrapper}>
-              <Text style={styles.title}>Sign Up</Text>
+              <Text style={styles.title}>
+                {step === "signup" ? "Sign Up" : "Confirm Email"}
+              </Text>
               <Text style={styles.subtitle}>
-                Create an account to continue!
+                {step === "signup"
+                  ? "Create an account to continue!"
+                  : `Enter the code sent to ${form.email}`}
               </Text>
             </View>
 
             {/* Inputs Group */}
             <View style={styles.formGroup}>
-              {/* First Name */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>First Name</Text>
-                <View style={styles.inputArea}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Lois"
-                    placeholderTextColor="#1A1C1E"
-                    value={form.firstName}
-                    onChangeText={(t) => setForm({ ...form, firstName: t })}
-                  />
-                </View>
-              </View>
-
-              {/* Last Name */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Last Name</Text>
-                <View style={styles.inputArea}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Becket"
-                    placeholderTextColor="#1A1C1E"
-                    value={form.lastName}
-                    onChangeText={(t) => setForm({ ...form, lastName: t })}
-                  />
-                </View>
-              </View>
-
-              {/* Email */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Email</Text>
-                <View style={styles.inputArea}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Loisbecket@gmail.com"
-                    placeholderTextColor="#1A1C1E"
-                    value={form.email}
-                    onChangeText={(t) => setForm({ ...form, email: t })}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* Date of Birth */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Date of birth</Text>
-                <View style={styles.inputArea}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="18/03/2024"
-                    placeholderTextColor="#1A1C1E"
-                    value={form.dob}
-                    onChangeText={(t) => setForm({ ...form, dob: t })}
-                  />
-                  <Calendar size={18} color="#6C7278" />
-                </View>
-              </View>
-
-              {/* Phone Number */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Phone Number</Text>
-                <View style={styles.phoneContainer}>
-                  {/* Country Code Mock */}
-                  <View style={styles.countrySelector}>
-                    <Text style={{ fontSize: 16 }}>🇬🇧</Text>
-                    <ChevronDown size={14} color="#6C7278" />
+              {step === "signup" ? (
+                <>
+                  {/* First Name */}
+                  <View style={styles.fieldContainer}>
+                    <Text style={styles.label}>First Name</Text>
+                    <View style={styles.inputArea}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Lois"
+                        placeholderTextColor="#1A1C1E"
+                        value={form.firstName}
+                        onChangeText={(t) => setForm({ ...form, firstName: t })}
+                      />
+                    </View>
                   </View>
 
-                  <View style={styles.phoneInputArea}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="(454) 726-0592"
-                      placeholderTextColor="#1A1C1E"
-                      value={form.phone}
-                      onChangeText={(t) => setForm({ ...form, phone: t })}
-                      keyboardType="phone-pad"
-                    />
+                  {/* Last Name */}
+                  <View style={styles.fieldContainer}>
+                    <Text style={styles.label}>Last Name</Text>
+                    <View style={styles.inputArea}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Becket"
+                        placeholderTextColor="#1A1C1E"
+                        value={form.lastName}
+                        onChangeText={(t) => setForm({ ...form, lastName: t })}
+                      />
+                    </View>
                   </View>
-                </View>
-              </View>
 
-              {/* Password */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Set Password</Text>
-                <View style={styles.inputArea}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="*******"
-                    placeholderTextColor="#1A1C1E"
-                    secureTextEntry={!showPassword}
-                    value={form.password}
-                    onChangeText={(t) => setForm({ ...form, password: t })}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff size={18} color="#6C7278" />
-                    ) : (
-                      <Eye size={18} color="#6C7278" />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
+                  {/* Email */}
+                  <View style={styles.fieldContainer}>
+                    <Text style={styles.label}>Email</Text>
+                    <View style={styles.inputArea}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Loisbecket@gmail.com"
+                        placeholderTextColor="#1A1C1E"
+                        value={form.email}
+                        onChangeText={(t) => setForm({ ...form, email: t })}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Password */}
+                  <View style={styles.fieldContainer}>
+                    <Text style={styles.label}>Set Password</Text>
+                    <View style={styles.inputArea}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="*******"
+                        placeholderTextColor="#1A1C1E"
+                        secureTextEntry={!showPassword}
+                        value={form.password}
+                        onChangeText={(t) => setForm({ ...form, password: t })}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={18} color="#6C7278" />
+                        ) : (
+                          <Eye size={18} color="#6C7278" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {/* Confirmation Code Input */}
+                  <View style={styles.fieldContainer}>
+                    <Text style={styles.label}>Confirmation Code</Text>
+                    <View style={styles.inputArea}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="123456"
+                        placeholderTextColor="#1A1C1E"
+                        value={code}
+                        onChangeText={setCode}
+                        keyboardType="number-pad"
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
             </View>
 
-            {/* Register Button */}
+            {/* Action Button */}
             <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={handleRegister} disabled={loading}>
+              <TouchableOpacity
+                onPress={step === "signup" ? handleRegister : handleConfirm}
+                disabled={loading}
+              >
                 <LinearGradient
                   colors={["rgba(20, 20, 20, 1)", "rgba(0, 0, 0, 1)"]}
                   style={styles.registerButton}
@@ -216,26 +233,29 @@ export default function SignUp() {
                   {loading ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text style={styles.registerButtonText}>Register</Text>
+                    <Text style={styles.registerButtonText}>
+                      {step === "signup" ? "Register" : "Verify & Login"}
+                    </Text>
                   )}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
 
             {/* Footer */}
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => router.push("/auth/login")}>
-                <Text style={styles.footerLink}>Login</Text>
-              </TouchableOpacity>
-            </View>
+            {step === "signup" && (
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>Already have an account? </Text>
+                <TouchableOpacity onPress={() => router.push("/auth/login")}>
+                  <Text style={styles.footerLink}>Login</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
