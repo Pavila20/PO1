@@ -1,12 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import {
-  Calendar,
-  ChevronDown,
-  ChevronLeft,
-  Eye,
-  EyeOff,
-} from "lucide-react-native";
+import { ChevronLeft, Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -21,8 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  signUpEmailPassword,
   confirmSignUp,
+  signUpEmailPassword,
 } from "../../src/auth/emailPassword"; // AWS
 
 const { width, height } = Dimensions.get("window");

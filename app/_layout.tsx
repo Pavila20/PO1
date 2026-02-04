@@ -1,8 +1,8 @@
-import "../src/polyfills/crypto";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ThemeProvider } from "../context/ThemeContext";
 import * as WebBrowser from "expo-web-browser";
+import { ThemeProvider } from "../context/ThemeContext";
+import "../src/polyfills/crypto";
 
 // Required for Google Sign In to complete the auth session
 WebBrowser.maybeCompleteAuthSession();

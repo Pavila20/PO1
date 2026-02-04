@@ -1,6 +1,9 @@
+// context/ThemeContext.tsx
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useColorScheme } from "react-native";
+import { Colors, ThemeColors } from "../src/constants/Colors";
 
 type ThemeMode = "light" | "dark" | "system";
 
@@ -8,36 +11,15 @@ interface ThemeContextType {
   theme: "light" | "dark";
   mode: ThemeMode;
   setMode: (mode: ThemeMode) => void;
-  colors: any;
+  colors: ThemeColors;
 }
 
-const Colors = {
-  light: {
-    background: "#FFF9F0",
-    card: "#FFFFFF",
-    text: "#2C2C2C",
-    subtext: "#8E8E93",
-    primary: "#FF5E3A",
-    border: "#E5E5EA",
-    input: "#F2F2F7",
-  },
-  dark: {
-    background: "#1C1C1E",
-    card: "#2C2C2E",
-    text: "#FFFFFF",
-    subtext: "#AEAEB2",
-    primary: "#FF5E3A",
-    border: "#3A3A3C",
-    input: "#1C1C1E",
-  },
-};
-
-// FIX: Provide default values here so it doesn't crash if Provider is missing
+// Provide safe defaults to avoid crashes if Provider is missing
 const ThemeContext = createContext<ThemeContextType>({
   theme: "light",
   mode: "system",
   setMode: () => {},
-  colors: Colors.light, // Default to light colors
+  colors: Colors.light,
 });
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
@@ -55,6 +37,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     AsyncStorage.setItem("themeMode", newMode);
   };
 
+  // Determine the active theme based on mode setting and system preference
   const activeTheme = mode === "system" ? systemScheme || "light" : mode;
 
   return (
