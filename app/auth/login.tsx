@@ -265,7 +265,14 @@ export default function LoginScreen() {
   const handleGoogle = async () => {
     try {
       await signInWithGoogle();
-      router.replace("/(tabs)/home");
+
+      // FIX: Check if setup was previously completed
+      const hasSetup = await AsyncStorage.getItem("is_setup_complete");
+      if (hasSetup === "true") {
+        router.replace("/(tabs)/home");
+      } else {
+        router.replace("/setup");
+      }
     } catch (error: any) {
       if (error.message !== "Login cancelled/failed") {
         Alert.alert("Google Sign-In Error", error.message);
@@ -322,7 +329,10 @@ export default function LoginScreen() {
               </View>
 
               {/* 3. Decorative Side Image (Bottom Right) */}
-              <View style={styles.decorativeImageContainer}>
+              <View
+                style={styles.decorativeImageContainer}
+                pointerEvents="none"
+              >
                 <Image
                   source={require("../../assets/images/Group 1547.svg")}
                   style={styles.decorativeImage}

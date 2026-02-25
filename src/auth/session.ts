@@ -1,3 +1,5 @@
+// src/auth/session.ts
+
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 
@@ -9,6 +11,8 @@ export type SessionUser = {
   email?: string;
   sub?: string;
   cognitoUsername?: string;
+  name?: string;
+  given_name?: string;
 };
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -20,6 +24,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     email: payload.email,
     sub: payload.sub,
     cognitoUsername: payload["cognito:username"],
+    name: payload.name,
+    given_name: payload.given_name,
   };
 }
 
