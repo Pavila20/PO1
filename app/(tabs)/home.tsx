@@ -12,8 +12,8 @@ import {
   LogOut,
   Moon,
   Plus,
-  Sparkles,
   Sun,
+  Thermometer,
   X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
@@ -160,25 +160,29 @@ export default function HomeScreen() {
 
   // 👇 UPDATED: Dynamic UI based on Pairing Status
   const isConnected = isPaired && !!machineData;
+
+  // Map the C++ State Machine to user-friendly text (safely using ?.)
   const statusText = !isPaired
     ? "Tap to connect machine"
     : !isConnected
       ? "Connecting..."
-      : machineData.status === "idle"
+      : machineData?.status === "IDLE"
         ? "Ready to Brew"
-        : machineData.status === "heating"
-          ? "Heating..."
-          : machineData.status === "brewing"
-            ? "Brewing..."
-            : "Done";
+        : machineData?.status === "USER_PROMPT"
+          ? "Action Required"
+          : machineData?.status === "ERROR"
+            ? "Error Check Machine"
+            : "Brewing..."; // Catches GRIND, PUMP, HEAT, DISPENSE
 
-  const statusColor = !isPaired
-    ? "#e72020" // Red for not paired
-    : !isConnected
-      ? "#FFA500" // Orange while searching
-      : machineData.status === "idle"
-        ? "#4CAF50" // Green for Ready
-        : "#FFA500"; // Orange for Heating/Brewing
+  // Colors: Green for IDLE, Red for ERROR/Unpaired, Orange for active brewing
+  const statusColor =
+    !isPaired || machineData?.status === "ERROR"
+      ? "#e72020"
+      : !isConnected
+        ? "#FFA500"
+        : machineData?.status === "IDLE"
+          ? "#4CAF50"
+          : "#FFA500";
 
   return (
     <SafeAreaView
@@ -416,10 +420,12 @@ export default function HomeScreen() {
                     { backgroundColor: "rgba(255,255,255,0.2)" },
                   ]}
                 >
-                  <Sparkles size={14} color="#000" />
+                  {/* Changed Sparkles to Thermometer */}
+                  <Thermometer size={14} color="#000" />
                 </View>
+                {/* Changed waterTemperature to boilerTemp */}
                 <Text style={styles.statLabel}>
-                  {machineData?.waterTemperature ?? "--"}°C
+                  {machineData?.boilerTemp ?? "--"}°C
                 </Text>
               </View>
 

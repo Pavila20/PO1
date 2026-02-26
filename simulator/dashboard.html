@@ -1,13 +1,159 @@
-async function fetchState() { // 👇 Added ?source=web so the server knows it's
-the dashboard asking const res = await fetch('/status?source=web'); const data =
-await res.json(); document.getElementById('state-display').innerText =
-JSON.stringify(data, null, 2); } <br /><br />
-<button onclick="updateState({ waterLevel: 100, waterLevelWarning: false })">
-  Refill Water (100%)
-</button>
-<button onclick="updateState({ waterLevel: 10, waterLevelWarning: true })">
-  Drain Water (10%)
-</button>
-<br /><br />
-<button onclick="updateState({ beanLevel: 100 })">Refill Beans (100%)</button>
-<button onclick="updateState({ beanLevel: 0 })">Empty Beans (0%)</button>
+<!doctype html>
+<html>
+  <head>
+    <title>ESP32 Pour-Over Simulator</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #131211;
+        color: #f5f3f1;
+        padding: 30px;
+        max-width: 900px;
+        margin: auto;
+      }
+      .header {
+        margin-bottom: 20px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .card {
+        background: #1f1b18;
+        border: 1px solid #3a342f;
+        padding: 25px;
+        border-radius: 16px;
+      }
+      h2,
+      h3 {
+        color: #c67c4e;
+        margin-top: 0;
+      }
+      .state-display {
+        background: #292522;
+        padding: 20px;
+        border-radius: 12px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        color: #d7cfc9;
+        border: 1px solid #3a342f;
+      }
+      .control-group {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #3a342f;
+      }
+      button {
+        background: #3a342f;
+        color: #f5f3f1;
+        border: none;
+        padding: 10px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 4px;
+        font-weight: 600;
+      }
+      button:hover {
+        background: #c67c4e;
+      }
+      .btn-green {
+        background: #2e7d32;
+      }
+      .btn-red {
+        background: #c62828;
+      }
+      .btn-warning {
+        background: #f57f17;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>☕ C++ State Machine Override</h2>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>📡 Live Hardware Struct</h3>
+        <div id="state-display" class="state-display">Loading...</div>
+      </div>
+      <div class="card">
+        <h3>🔧 Force State Change</h3>
+        <div class="control-group">
+          <strong style="display: block; margin-bottom: 8px"
+            >C++ Enum: MachineStates</strong
+          >
+          <button onclick="updateState({ status: 'IDLE' })">IDLE</button>
+          <button
+            class="btn-warning"
+            onclick="updateState({ status: 'GRIND' })"
+          >
+            GRIND
+          </button>
+          <button
+            class="btn-warning"
+            onclick="updateState({ status: 'USER_PROMPT' })"
+          >
+            USER_PROMPT
+          </button>
+          <button class="btn-warning" onclick="updateState({ status: 'PUMP' })">
+            PUMP
+          </button>
+          <button class="btn-warning" onclick="updateState({ status: 'HEAT' })">
+            HEAT
+          </button>
+          <button
+            class="btn-warning"
+            onclick="updateState({ status: 'DISPENSE' })"
+          >
+            DISPENSE
+          </button>
+          <button class="btn-red" onclick="updateState({ status: 'ERROR' })">
+            ERROR
+          </button>
+        </div>
+        <div class="control-group">
+          <strong style="display: block; margin-bottom: 8px"
+            >HX711 Load Cells & Dallas Temp</strong
+          >
+          <button class="btn-green" onclick="updateState({ waterLevel: 100 })">
+            Fill Water (1000mL)
+          </button>
+          <button class="btn-green" onclick="updateState({ beanLevel: 100 })">
+            Fill Beans (75g)
+          </button>
+          <br />
+          <button
+            class="btn-red"
+            onclick="updateState({ waterTemperature: 105 })"
+          >
+            Trigger Overheat (105°C)
+          </button>
+          <button onclick="updateState({ waterTemperature: 22 })">
+            Cool Down (22°C)
+          </button>
+        </div>
+      </div>
+    </div>
+    <script>
+      async function fetchState() {
+        const res = await fetch("/status?source=web");
+        document.getElementById("state-display").innerText = JSON.stringify(
+          await res.json(),
+          null,
+          2,
+        );
+      }
+      async function updateState(newState) {
+        await fetch("/simulate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newState),
+        });
+        fetchState();
+      }
+      setInterval(fetchState, 1000);
+      fetchState();
+    </script>
+  </body>
+</html>

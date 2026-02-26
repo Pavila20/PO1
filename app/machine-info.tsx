@@ -8,7 +8,7 @@ import {
   Coffee,
   Droplet,
   Info,
-  Sparkles,
+  Thermometer,
   Trash2,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -130,7 +130,7 @@ export default function MachineInfoScreen() {
             </View>
           </View>
 
-          {/* Row 2: Cup and Clean */}
+          {/* Row 2: Cup and Temperature */}
           <View style={styles.summaryRow}>
             <View style={styles.taskCard}>
               <View style={styles.iconCircle}>
@@ -142,13 +142,16 @@ export default function MachineInfoScreen() {
               </View>
             </View>
 
+            {/* 👇 Changed from "Next Clean" to Live Temperature! */}
             <View style={styles.taskCard}>
               <View style={styles.iconCircle}>
-                <Sparkles size={20} color="#fff" />
+                <Thermometer size={20} color="#fff" />
               </View>
               <View style={styles.taskText}>
-                <Text style={styles.taskTitle}>50 days</Text>
-                <Text style={styles.taskSubtitle}>next clean</Text>
+                <Text style={styles.taskTitle}>
+                  {machineData?.boilerTemp ?? "--"}°C
+                </Text>
+                <Text style={styles.taskSubtitle}>water temp</Text>
               </View>
             </View>
           </View>
