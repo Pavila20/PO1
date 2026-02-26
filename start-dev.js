@@ -42,7 +42,7 @@ tunnel.stdout.on("data", (data) => {
     console.log(`🚀 Starting Expo App with Tunnel...\n`);
 
     // 👇 UPDATED: Added '--tunnel' to the arguments array
-    spawn("npx", ["expo", "start", "--tunnel"], {
+    spawn("npx", ["expo", "start", "--tunnel", "-c"], {
       stdio: "inherit",
       shell: true,
     });

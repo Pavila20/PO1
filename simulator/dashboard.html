@@ -1,4 +1,13 @@
 async function fetchState() { // 👇 Added ?source=web so the server knows it's
 the dashboard asking const res = await fetch('/status?source=web'); const data =
 await res.json(); document.getElementById('state-display').innerText =
-JSON.stringify(data, null, 2); }
+JSON.stringify(data, null, 2); } <br /><br />
+<button onclick="updateState({ waterLevel: 100, waterLevelWarning: false })">
+  Refill Water (100%)
+</button>
+<button onclick="updateState({ waterLevel: 10, waterLevelWarning: true })">
+  Drain Water (10%)
+</button>
+<br /><br />
+<button onclick="updateState({ beanLevel: 100 })">Refill Beans (100%)</button>
+<button onclick="updateState({ beanLevel: 0 })">Empty Beans (0%)</button>

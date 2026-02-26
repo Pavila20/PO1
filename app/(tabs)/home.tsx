@@ -2,7 +2,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router"; // 👈 NEW: useFocusEffect added
 import {
   Bean,
   Camera,
@@ -16,7 +16,7 @@ import {
   Sun,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Modal,
@@ -30,36 +30,34 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
+import { getMachineStatus } from "../../src/api/machine";
 import { getSessionUser, signOutLocal } from "../../src/auth/session";
 
 const PROFILE_OPTIONS = [
   { id: "default", src: require("../../assets/images/dino.png") },
   { id: "avatar2", src: require("../../assets/images/chicken.png") },
   { id: "avatar3", src: require("../../assets/images/panda.png") },
-  {
-    id: "avatar4",
-    src: require("../../assets/images/giraffe.png"),
-  },
-  {
-    id: "avatar5",
-    src: require("../../assets/images/penguin.png"),
-  },
+  { id: "avatar4", src: require("../../assets/images/giraffe.png") },
+  { id: "avatar5", src: require("../../assets/images/penguin.png") },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, mode, setMode, theme } = useTheme();
-
   const isDark = theme === "dark";
 
   const [firstName, setFirstName] = useState("There");
   const [greeting, setGreeting] = useState("Good Morning");
   const [emoji, setEmoji] = useState("☕");
   const [profilePic, setProfilePic] = useState(PROFILE_OPTIONS[0].src);
-
   const [isMenuVisible, setMenuVisible] = useState(false);
   const [isPicModalVisible, setPicModalVisible] = useState(false);
 
+  // 👇 NEW: State to track if the user has actually paired a machine
+  const [isPaired, setIsPaired] = useState(false);
+  const [machineData, setMachineData] = useState<any>(null);
+
+  // 1. Clock and User Data
   useEffect(() => {
     const currentHour = new Date().getHours();
     if (currentHour < 12) {
@@ -80,29 +78,57 @@ export default function HomeScreen() {
       const user = await getSessionUser();
       if (user) {
         let nameToDisplay = "There";
-        if (user.given_name) {
-          nameToDisplay = user.given_name;
-        } else if (user.name) {
-          nameToDisplay = user.name.split(" ")[0];
-        } else if (user.email) {
+        if (user.given_name) nameToDisplay = user.given_name;
+        else if (user.name) nameToDisplay = user.name.split(" ")[0];
+        else if (user.email) {
           nameToDisplay = user.email.split("@")[0];
           nameToDisplay =
             nameToDisplay.charAt(0).toUpperCase() + nameToDisplay.slice(1);
         }
         setFirstName(nameToDisplay);
       }
-
       const savedPicId = await AsyncStorage.getItem("user_profile_pic");
       if (savedPicId) {
         const foundPic = PROFILE_OPTIONS.find((p) => p.id === savedPicId);
-        if (foundPic) {
-          setProfilePic(foundPic.src);
-        }
+        if (foundPic) setProfilePic(foundPic.src);
+      }
+    };
+    loadUserData();
+  }, []);
+
+  // 👇 NEW: Check pairing status every time this screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const checkPairing = async () => {
+        const paired = await AsyncStorage.getItem("isMachinePaired");
+        setIsPaired(paired === "true");
+      };
+      checkPairing();
+    }, []),
+  );
+
+  // 👇 UPDATED: Only poll the machine if it is actually paired!
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    const fetchMachine = async () => {
+      if (isPaired) {
+        const data = await getMachineStatus();
+        setMachineData(data);
       }
     };
 
-    loadUserData();
-  }, []);
+    if (isPaired) {
+      fetchMachine();
+      interval = setInterval(fetchMachine, 2000);
+    } else {
+      setMachineData(null); // Clear data if unpaired
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPaired]); // Re-run effect if pairing status changes
 
   const handleLogout = () => {
     setMenuVisible(false);
@@ -132,6 +158,28 @@ export default function HomeScreen() {
     await AsyncStorage.setItem("user_profile_pic", selectedOption.id);
   };
 
+  // 👇 UPDATED: Dynamic UI based on Pairing Status
+  const isConnected = isPaired && !!machineData;
+  const statusText = !isPaired
+    ? "Tap to connect machine"
+    : !isConnected
+      ? "Connecting..."
+      : machineData.status === "idle"
+        ? "Ready to Brew"
+        : machineData.status === "heating"
+          ? "Heating..."
+          : machineData.status === "brewing"
+            ? "Brewing..."
+            : "Done";
+
+  const statusColor = !isPaired
+    ? "#e72020" // Red for not paired
+    : !isConnected
+      ? "#FFA500" // Orange while searching
+      : machineData.status === "idle"
+        ? "#4CAF50" // Green for Ready
+        : "#FFA500"; // Orange for Heating/Brewing
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -139,6 +187,7 @@ export default function HomeScreen() {
     >
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
+      {/* MODALS START */}
       <Modal
         visible={isMenuVisible}
         transparent={true}
@@ -163,14 +212,12 @@ export default function HomeScreen() {
                 Change Picture
               </Text>
             </TouchableOpacity>
-
             <View
               style={[
                 styles.menuDivider,
                 { backgroundColor: isDark ? "#444" : "#E5E5E5" },
               ]}
             />
-
             <View style={styles.menuRow}>
               {isDark ? (
                 <Moon color={colors.text} size={20} />
@@ -186,14 +233,12 @@ export default function HomeScreen() {
                 trackColor={{ false: "#767577", true: colors.primaryButton }}
               />
             </View>
-
             <View
               style={[
                 styles.menuDivider,
                 { backgroundColor: isDark ? "#444" : "#E5E5E5" },
               ]}
             />
-
             <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
               <LogOut color="#e72020" size={20} />
               <Text style={[styles.menuText, { color: "#e72020" }]}>
@@ -225,7 +270,6 @@ export default function HomeScreen() {
                 <X color={colors.text} size={24} />
               </TouchableOpacity>
             </View>
-
             <View style={styles.picGrid}>
               {PROFILE_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -254,6 +298,7 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+      {/* MODALS END */}
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -293,23 +338,24 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* 👇 UPDATED WIDGET: Routes to /machine-info if paired, otherwise /setup */}
         <TouchableOpacity
           style={[
             styles.widgetContainer,
             { backgroundColor: colors.widgetBackground },
           ]}
-          onPress={() => router.push("/setup")}
+          onPress={() => router.push(isPaired ? "/machine-info" : "/setup")}
           activeOpacity={0.9}
         >
           <View style={styles.widgetHeader}>
             <View style={styles.widgetTitleContainer}>
               <Text style={[styles.widgetTitle, { color: colors.widgetText }]}>
-                PourOver1
+                {isPaired ? "PourOver1" : "No Machine"}
               </Text>
               <View
-                style={[styles.statusBadge, { backgroundColor: "#e72020" }]}
+                style={[styles.statusBadge, { backgroundColor: statusColor }]}
               >
-                <Text style={styles.statusText}>Not ready</Text>
+                <Text style={styles.statusText}>{statusText}</Text>
               </View>
             </View>
             <ChevronRight size={24} color={colors.widgetText} />
@@ -331,10 +377,24 @@ export default function HomeScreen() {
 
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
-                <View style={[styles.statCircle, styles.statCritical]}>
-                  <Droplet size={14} color="#e72020" fill="#e72020" />
+                <View
+                  style={[
+                    styles.statCircle,
+                    machineData?.waterLevelWarning
+                      ? styles.statCritical
+                      : { backgroundColor: "rgba(255,255,255,0.2)" },
+                  ]}
+                >
+                  <Droplet
+                    size={14}
+                    color={machineData?.waterLevelWarning ? "#e72020" : "#000"}
+                  />
                 </View>
+                <Text style={styles.statLabel}>
+                  {machineData?.waterLevel ?? "--"}%
+                </Text>
               </View>
+
               <View style={styles.statItem}>
                 <View
                   style={[
@@ -344,7 +404,11 @@ export default function HomeScreen() {
                 >
                   <Bean size={14} color="#000" />
                 </View>
+                <Text style={styles.statLabel}>
+                  {machineData?.beanLevel ?? "--"}%
+                </Text>
               </View>
+
               <View style={styles.statItem}>
                 <View
                   style={[
@@ -354,7 +418,11 @@ export default function HomeScreen() {
                 >
                   <Sparkles size={14} color="#000" />
                 </View>
+                <Text style={styles.statLabel}>
+                  {machineData?.waterTemperature ?? "--"}°C
+                </Text>
               </View>
+
               <View style={styles.statItem}>
                 <View
                   style={[
@@ -364,6 +432,12 @@ export default function HomeScreen() {
                 >
                   <Coffee size={14} color="#000" />
                 </View>
+                <Text style={styles.statLabel}>
+                  {machineData?.status
+                    ? machineData.status.charAt(0).toUpperCase() +
+                      machineData.status.slice(1)
+                    : "--"}
+                </Text>
               </View>
             </View>
           </View>
@@ -378,6 +452,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
           >
+            {/* Recommend Cards */}
             <TouchableOpacity
               style={[styles.recommendCard, { backgroundColor: colors.card }]}
               onPress={() =>
@@ -561,7 +636,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -587,15 +661,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12,
   },
-  menuText: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  menuDivider: {
-    height: 1,
-    width: "100%",
-  },
-
+  menuText: { fontSize: 16, fontWeight: "500" },
+  menuDivider: { height: 1, width: "100%" },
   picModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -618,10 +685,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  picModalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
+  picModalTitle: { fontSize: 20, fontWeight: "700" },
   picGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -637,11 +701,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     overflow: "hidden",
   },
-  picOptionImage: {
-    width: "100%",
-    height: "100%",
-  },
-
+  picOptionImage: { width: "100%", height: "100%" },
   scrollContent: { paddingHorizontal: 21, paddingBottom: 100, gap: 24 },
   header: {
     flexDirection: "row",
@@ -690,13 +750,13 @@ const styles = StyleSheet.create({
   },
   machineImage: { width: 100, height: 120 },
   statsContainer: {
-    width: 140,
+    width: 160,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
     justifyContent: "center",
   },
-  statItem: { alignItems: "center", justifyContent: "center" },
+  statItem: { alignItems: "center", justifyContent: "center", width: 35 },
   statCircle: {
     width: 32,
     height: 32,
@@ -709,6 +769,7 @@ const styles = StyleSheet.create({
     borderColor: "#e72020",
     backgroundColor: "#fff",
   },
+  statLabel: { fontSize: 10, fontWeight: "600", marginTop: 4, color: "#fff" },
   sectionContainer: { gap: 12 },
   sectionTitle: { fontSize: 20, fontWeight: "600" },
   horizontalScroll: { gap: 12 },

@@ -1,18 +1,20 @@
-import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image"; // optimized image component
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { CheckCircle } from "lucide-react-native"; // Badge icon
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // <--- Import this
-
 export default function SetupSuccess() {
   const router = useRouter();
 
   const handleGetStarted = async () => {
     try {
-      // FIX: Mark setup as complete
+      // Mark the general app setup as complete
       await AsyncStorage.setItem("is_setup_complete", "true");
+
+      // 👇 NEW: Mark the specific machine as paired so home.tsx sees it!
+      await AsyncStorage.setItem("isMachinePaired", "true");
 
       router.replace("/(tabs)/home");
     } catch (error) {
@@ -20,7 +22,14 @@ export default function SetupSuccess() {
       router.replace("/(tabs)/home");
     }
   };
+  // Inside your success component...
+  const handleFinishSetup = async () => {
+    // 👇 Save that the machine is successfully paired!
+    await AsyncStorage.setItem("isMachinePaired", "true");
 
+    // Navigate home
+    router.replace("/(tabs)/home");
+  };
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
