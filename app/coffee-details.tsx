@@ -1,10 +1,9 @@
-// app/coffee-details.tsx
-
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import React from "react";
 import {
+  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -15,10 +14,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../context/ThemeContext";
+import { sendBrewCommand } from "../src/api/machine";
 
 // Map the coffee names to your local assets
 const coffeeImages: Record<string, any> = {
-  "Medium Coffee": require("../assets/images/CreamLatteCoffeeIcon.png"),
+  "Cream Latte": require("../assets/images/CreamLatteCoffeeIcon.png"),
   "Dark Coffee": require("../assets/images/DarkCoffeeIcon.png"),
   "Light Coffee": require("../assets/images/LightCoffeeIcon.png"),
 };
@@ -54,10 +54,25 @@ export default function CoffeeDetailsScreen() {
   const coffeeName = (name as string) || "Light Coffee";
   const coffeeImage = coffeeImages[coffeeName] || coffeeImages["Light Coffee"];
 
-  // Map the passed string ("Weak", "Strong", "Light") to our 3 pill states
-  // Since it's a recommended coffee, it stays fixed on this value.
+  // Map the passed string ("Weak", "Strong", "Light", "Medium") to our 3 pill states
   const bitterness: BitternessLevel =
     strength === "Strong" ? "High" : strength === "Medium" ? "Medium" : "Low";
+
+  // --- Send Command to Simulator / ESP32 ---
+  const handleBrew = async () => {
+    // We pass the coffeeName and the strength string to the API
+    const result = await sendBrewCommand(coffeeName, strength as string);
+
+    if (result && result.success) {
+      Alert.alert("Brewing Started!", `${coffeeName} is now brewing.`);
+      router.replace("/(tabs)/home"); // Send them back to the home screen
+    } else {
+      Alert.alert(
+        "Connection Error",
+        "Could not reach the coffee machine simulator.",
+      );
+    }
+  };
 
   return (
     <SafeAreaView
@@ -213,6 +228,7 @@ export default function CoffeeDetailsScreen() {
             { backgroundColor: colors.primaryButton },
           ]}
           activeOpacity={0.8}
+          onPress={handleBrew}
         >
           <Text style={styles.continueButtonText}>Continue</Text>
         </TouchableOpacity>
@@ -309,7 +325,7 @@ const styles = StyleSheet.create({
   },
   beanCircleActive: {
     backgroundColor: "rgba(240, 206, 171, 0.9)", // Glowing beige background
-    shadowColor: "#F97E02",
+    shadowColor: "#F0CEAB",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 10,

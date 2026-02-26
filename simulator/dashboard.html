@@ -1,0 +1,4 @@
+async function fetchState() { // 👇 Added ?source=web so the server knows it's
+the dashboard asking const res = await fetch('/status?source=web'); const data =
+await res.json(); document.getElementById('state-display').innerText =
+JSON.stringify(data, null, 2); }

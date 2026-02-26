@@ -42,7 +42,9 @@
       ],
       "expo-web-browser",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      "react-native-ble-plx",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,
