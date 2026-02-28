@@ -66,6 +66,9 @@
       .btn-warning {
         background: #f57f17;
       }
+      .btn-blue {
+        background: #1976d2;
+      }
     </style>
   </head>
   <body>
@@ -79,6 +82,43 @@
       </div>
       <div class="card">
         <h3>🔧 Force State Change</h3>
+
+        <div class="control-group">
+          <strong style="display: block; margin-bottom: 8px"
+            >📍 Sensor 1: Grinder Station</strong
+          >
+          <button
+            class="btn-blue"
+            onclick="updateState({ grinderCupDetected: true })"
+          >
+            Cup Placed (TRUE)
+          </button>
+          <button
+            class="btn-red"
+            onclick="updateState({ grinderCupDetected: false })"
+          >
+            Cup Removed (FALSE)
+          </button>
+        </div>
+
+        <div class="control-group">
+          <strong style="display: block; margin-bottom: 8px"
+            >📍 Sensor 2: Dispenser Station</strong
+          >
+          <button
+            class="btn-blue"
+            onclick="updateState({ dispenserCupDetected: true })"
+          >
+            Cup Placed (TRUE)
+          </button>
+          <button
+            class="btn-red"
+            onclick="updateState({ dispenserCupDetected: false })"
+          >
+            Cup Removed (FALSE)
+          </button>
+        </div>
+
         <div class="control-group">
           <strong style="display: block; margin-bottom: 8px"
             >C++ Enum: MachineStates</strong
@@ -112,6 +152,7 @@
             ERROR
           </button>
         </div>
+
         <div class="control-group">
           <strong style="display: block; margin-bottom: 8px"
             >HX711 Load Cells & Dallas Temp</strong

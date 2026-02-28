@@ -1,8 +1,6 @@
-// app/(tabs)/home.tsx
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { useFocusEffect, useRouter } from "expo-router"; // 👈 NEW: useFocusEffect added
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Bean,
   Camera,
@@ -12,11 +10,13 @@ import {
   LogOut,
   Moon,
   Plus,
+  Smartphone,
   Sun,
   Thermometer,
+  Trash2,
   X,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Modal,
@@ -28,6 +28,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  GestureHandlerRootView,
+  Swipeable,
+} from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { getMachineStatus } from "../../src/api/machine";
@@ -53,11 +57,12 @@ export default function HomeScreen() {
   const [isMenuVisible, setMenuVisible] = useState(false);
   const [isPicModalVisible, setPicModalVisible] = useState(false);
 
-  // 👇 NEW: State to track if the user has actually paired a machine
   const [isPaired, setIsPaired] = useState(false);
   const [machineData, setMachineData] = useState<any>(null);
 
-  // 1. Clock and User Data
+  const [coffeePref, setCoffeePref] = useState("8");
+  const [savedRecipes, setSavedRecipes] = useState<any[]>([]);
+
   useEffect(() => {
     const currentHour = new Date().getHours();
     if (currentHour < 12) {
@@ -96,18 +101,24 @@ export default function HomeScreen() {
     loadUserData();
   }, []);
 
-  // 👇 NEW: Check pairing status every time this screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      const checkPairing = async () => {
+      const loadDynamicData = async () => {
         const paired = await AsyncStorage.getItem("isMachinePaired");
         setIsPaired(paired === "true");
+
+        const pref = await AsyncStorage.getItem("user_coffee_pref");
+        if (pref) setCoffeePref(pref);
+
+        const recipesStr = await AsyncStorage.getItem("user_recipes");
+        if (recipesStr) {
+          setSavedRecipes(JSON.parse(recipesStr));
+        }
       };
-      checkPairing();
+      loadDynamicData();
     }, []),
   );
 
-  // 👇 UPDATED: Only poll the machine if it is actually paired!
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
@@ -122,13 +133,13 @@ export default function HomeScreen() {
       fetchMachine();
       interval = setInterval(fetchMachine, 2000);
     } else {
-      setMachineData(null); // Clear data if unpaired
+      setMachineData(null);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPaired]); // Re-run effect if pairing status changes
+  }, [isPaired]);
 
   const handleLogout = () => {
     setMenuVisible(false);
@@ -158,10 +169,26 @@ export default function HomeScreen() {
     await AsyncStorage.setItem("user_profile_pic", selectedOption.id);
   };
 
-  // 👇 UPDATED: Dynamic UI based on Pairing Status
+  // --- DELETE RECIPE LOGIC ---
+  const handleDeleteRecipe = async (id: string) => {
+    const updatedRecipes = savedRecipes.filter((recipe) => recipe.id !== id);
+    setSavedRecipes(updatedRecipes);
+    await AsyncStorage.setItem("user_recipes", JSON.stringify(updatedRecipes));
+  };
+
+  const renderRightActions = (id: string) => {
+    return (
+      <TouchableOpacity
+        style={styles.deleteAction}
+        onPress={() => handleDeleteRecipe(id)}
+      >
+        <Trash2 color="#fff" size={24} />
+      </TouchableOpacity>
+    );
+  };
+
   const isConnected = isPaired && !!machineData;
 
-  // Map the C++ State Machine to user-friendly text (safely using ?.)
   const statusText = !isPaired
     ? "Tap to connect machine"
     : !isConnected
@@ -172,9 +199,8 @@ export default function HomeScreen() {
           ? "Action Required"
           : machineData?.status === "ERROR"
             ? "Error Check Machine"
-            : "Brewing..."; // Catches GRIND, PUMP, HEAT, DISPENSE
+            : "Brewing...";
 
-  // Colors: Green for IDLE, Red for ERROR/Unpaired, Orange for active brewing
   const statusColor =
     !isPaired || machineData?.status === "ERROR"
       ? "#e72020"
@@ -185,458 +211,511 @@ export default function HomeScreen() {
           : "#FFA500";
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={["top"]}
-    >
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-
-      {/* MODALS START */}
-      <Modal
-        visible={isMenuVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setMenuVisible(false)}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        edges={["top"]}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setMenuVisible(false)}
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+
+        <Modal
+          visible={isMenuVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setMenuVisible(false)}
         >
           <TouchableOpacity
+            style={styles.modalOverlay}
             activeOpacity={1}
-            style={[styles.menuContent, { backgroundColor: colors.card }]}
+            onPress={() => setMenuVisible(false)}
           >
             <TouchableOpacity
-              style={styles.menuRow}
-              onPress={handleChangePicture}
+              activeOpacity={1}
+              style={[styles.menuContent, { backgroundColor: colors.card }]}
             >
-              <Camera color={colors.text} size={20} />
-              <Text style={[styles.menuText, { color: colors.text }]}>
-                Change Picture
-              </Text>
-            </TouchableOpacity>
-            <View
-              style={[
-                styles.menuDivider,
-                { backgroundColor: isDark ? "#444" : "#E5E5E5" },
-              ]}
-            />
-            <View style={styles.menuRow}>
-              {isDark ? (
-                <Moon color={colors.text} size={20} />
-              ) : (
-                <Sun color={colors.text} size={20} />
-              )}
-              <Text style={[styles.menuText, { color: colors.text, flex: 1 }]}>
-                Dark Mode
-              </Text>
-              <Switch
-                value={mode === "dark"}
-                onValueChange={(val) => setMode(val ? "dark" : "light")}
-                trackColor={{ false: "#767577", true: colors.primaryButton }}
+              <TouchableOpacity
+                style={styles.menuRow}
+                onPress={handleChangePicture}
+              >
+                <Camera color={colors.text} size={20} />
+                <Text style={[styles.menuText, { color: colors.text }]}>
+                  Change Picture
+                </Text>
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.menuDivider,
+                  { backgroundColor: isDark ? "#444" : "#E5E5E5" },
+                ]}
               />
-            </View>
-            <View
-              style={[
-                styles.menuDivider,
-                { backgroundColor: isDark ? "#444" : "#E5E5E5" },
-              ]}
-            />
-            <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
-              <LogOut color="#e72020" size={20} />
-              <Text style={[styles.menuText, { color: "#e72020" }]}>
-                Log Out
-              </Text>
+
+              <View style={styles.menuThemeSection}>
+                <View style={[styles.menuRow, styles.themeRow]}>
+                  {theme === "dark" ? (
+                    <Moon color={colors.text} size={20} />
+                  ) : (
+                    <Sun color={colors.text} size={20} />
+                  )}
+                  <Text
+                    style={[styles.menuText, { color: colors.text, flex: 1 }]}
+                  >
+                    Dark Mode
+                  </Text>
+                  <Switch
+                    value={theme === "dark"}
+                    onValueChange={(val) => setMode(val ? "dark" : "light")}
+                    trackColor={{
+                      false: "#767577",
+                      true: colors.primaryButton,
+                    }}
+                  />
+                </View>
+
+                <View style={[styles.menuRow, styles.themeRow]}>
+                  <Smartphone color={colors.text} size={20} />
+                  <Text
+                    style={[styles.menuText, { color: colors.text, flex: 1 }]}
+                  >
+                    System Theme
+                  </Text>
+                  <Switch
+                    value={mode === "system"}
+                    onValueChange={(val) => setMode(val ? "system" : theme)}
+                    trackColor={{
+                      false: "#767577",
+                      true: colors.primaryButton,
+                    }}
+                  />
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.menuDivider,
+                  { backgroundColor: isDark ? "#444" : "#E5E5E5" },
+                ]}
+              />
+
+              <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
+                <LogOut color="#e72020" size={20} />
+                <Text style={[styles.menuText, { color: "#e72020" }]}>
+                  Log Out
+                </Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        </Modal>
 
-      <Modal
-        visible={isPicModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setPicModalVisible(false)}
-      >
-        <View style={styles.picModalOverlay}>
-          <View
-            style={[
-              styles.picModalContent,
-              { backgroundColor: colors.background },
-            ]}
-          >
-            <View style={styles.picModalHeader}>
-              <Text style={[styles.picModalTitle, { color: colors.text }]}>
-                Choose an Avatar
+        <Modal
+          visible={isPicModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setPicModalVisible(false)}
+        >
+          <View style={styles.picModalOverlay}>
+            <View
+              style={[
+                styles.picModalContent,
+                { backgroundColor: colors.background },
+              ]}
+            >
+              <View style={styles.picModalHeader}>
+                <Text style={[styles.picModalTitle, { color: colors.text }]}>
+                  Choose an Avatar
+                </Text>
+                <TouchableOpacity onPress={() => setPicModalVisible(false)}>
+                  <X color={colors.text} size={24} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.picGrid}>
+                {PROFILE_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[
+                      styles.picOption,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor:
+                          profilePic === option.src
+                            ? colors.primaryButton
+                            : "transparent",
+                      },
+                    ]}
+                    onPress={() => selectNewProfilePic(option)}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={option.src}
+                      style={styles.picOptionImage}
+                      contentFit="contain"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <View style={styles.greetingContainer}>
+              <View style={styles.greetingTextWrapper}>
+                <Text style={[styles.greetingName, { color: colors.text }]}>
+                  Hi, {firstName} {emoji}
+                </Text>
+                <Text style={[styles.greetingTime, { color: colors.text }]}>
+                  {greeting}
+                </Text>
+              </View>
+              <Text style={[styles.subtitle, { color: colors.subtext }]}>
+                What would you like to order today?
               </Text>
-              <TouchableOpacity onPress={() => setPicModalVisible(false)}>
-                <X color={colors.text} size={24} />
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.profileButton,
+                {
+                  backgroundColor: colors.primaryButton,
+                  borderColor: colors.primaryButton,
+                },
+              ]}
+              activeOpacity={0.8}
+              onPress={() => setMenuVisible(true)}
+            >
+              <Image
+                source={profilePic}
+                style={styles.profileImage}
+                contentFit="cover"
+              />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.widgetContainer,
+              { backgroundColor: colors.widgetBackground },
+            ]}
+            onPress={() => router.push(isPaired ? "/machine-info" : "/setup")}
+            activeOpacity={0.9}
+          >
+            <View style={styles.widgetHeader}>
+              <View style={styles.widgetTitleContainer}>
+                <Text
+                  style={[styles.widgetTitle, { color: colors.widgetText }]}
+                >
+                  {isPaired ? "PourOver1" : "No Machine"}
+                </Text>
+                <View
+                  style={[styles.statusBadge, { backgroundColor: statusColor }]}
+                >
+                  <Text style={styles.statusText}>{statusText}</Text>
+                </View>
+              </View>
+              <ChevronRight size={24} color={colors.widgetText} />
+            </View>
+
+            <View
+              style={[
+                styles.machineContent,
+                { backgroundColor: isDark ? "#A9612F" : "#C27A45" },
+              ]}
+            >
+              <View style={styles.machineImageWrapper}>
+                <Image
+                  source={require("../../assets/images/PO1.png")}
+                  style={styles.machineImage}
+                  contentFit="contain"
+                />
+              </View>
+
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <View
+                    style={[
+                      styles.statCircle,
+                      machineData?.waterLevelWarning
+                        ? styles.statCritical
+                        : { backgroundColor: "rgba(255,255,255,0.2)" },
+                    ]}
+                  >
+                    <Droplet
+                      size={14}
+                      color={
+                        machineData?.waterLevelWarning ? "#e72020" : "#000"
+                      }
+                    />
+                  </View>
+                  <Text style={styles.statLabel}>
+                    {machineData?.waterLevel ?? "--"}%
+                  </Text>
+                </View>
+
+                <View style={styles.statItem}>
+                  <View
+                    style={[
+                      styles.statCircle,
+                      { backgroundColor: "rgba(255,255,255,0.2)" },
+                    ]}
+                  >
+                    <Bean size={14} color="#000" />
+                  </View>
+                  <Text style={styles.statLabel}>
+                    {machineData?.beanLevel ?? "--"}%
+                  </Text>
+                </View>
+
+                <View style={styles.statItem}>
+                  <View
+                    style={[
+                      styles.statCircle,
+                      { backgroundColor: "rgba(255,255,255,0.2)" },
+                    ]}
+                  >
+                    <Thermometer size={14} color="#000" />
+                  </View>
+                  <Text style={styles.statLabel}>
+                    {machineData?.boilerTemp ?? "--"}°C
+                  </Text>
+                </View>
+
+                <View style={styles.statItem}>
+                  <View
+                    style={[
+                      styles.statCircle,
+                      { backgroundColor: "rgba(255,255,255,0.2)" },
+                    ]}
+                  >
+                    <Coffee size={14} color="#000" />
+                  </View>
+                  <Text style={styles.statLabel}>
+                    {machineData?.status
+                      ? machineData.status.charAt(0).toUpperCase() +
+                        machineData.status.slice(1)
+                      : "--"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Recommended
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              <TouchableOpacity
+                style={[styles.recommendCard, { backgroundColor: colors.card }]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/coffee-details",
+                    params: { name: "Medium Coffee", strength: "Medium" },
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={require("../../assets/images/CreamLatteCoffeeIcon.png")}
+                  style={styles.recommendImage}
+                  contentFit="contain"
+                />
+                <View style={styles.recommendTextContainer}>
+                  <Text
+                    style={[
+                      styles.recommendTitle,
+                      { color: colors.cardHeader },
+                    ]}
+                  >
+                    Medium Coffee
+                  </Text>
+                  <Text
+                    style={[
+                      styles.recommendSubtitle,
+                      { color: colors.cardSubtext },
+                    ]}
+                  >
+                    Medium
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.recommendCard, { backgroundColor: colors.card }]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/coffee-details",
+                    params: { name: "Dark Coffee", strength: "Strong" },
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={require("../../assets/images/DarkCoffeeIcon.png")}
+                  style={styles.recommendImage}
+                  contentFit="contain"
+                />
+                <View style={styles.recommendTextContainer}>
+                  <Text
+                    style={[
+                      styles.recommendTitle,
+                      { color: colors.cardHeader },
+                    ]}
+                  >
+                    Dark Coffee
+                  </Text>
+                  <Text
+                    style={[
+                      styles.recommendSubtitle,
+                      { color: colors.cardSubtext },
+                    ]}
+                  >
+                    Strong
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.recommendCard, { backgroundColor: colors.card }]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/coffee-details",
+                    params: { name: "Light Coffee", strength: "Light" },
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={require("../../assets/images/LightCoffeeIcon.png")}
+                  style={styles.recommendImage}
+                  contentFit="contain"
+                />
+                <View style={styles.recommendTextContainer}>
+                  <Text
+                    style={[
+                      styles.recommendTitle,
+                      { color: colors.cardHeader },
+                    ]}
+                  >
+                    Light Coffee
+                  </Text>
+                  <Text
+                    style={[
+                      styles.recommendSubtitle,
+                      { color: colors.cardSubtext },
+                    ]}
+                  >
+                    Light
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+
+          <View style={styles.sectionContainer}>
+            <View style={styles.recipeHeader}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: colors.widgetBackground },
+                ]}
+              >
+                Your Recipes
+              </Text>
+              <TouchableOpacity
+                style={styles.plusButton}
+                onPress={() => router.push("/create-recipe")}
+              >
+                <Plus size={16} color="#000" />
               </TouchableOpacity>
             </View>
-            <View style={styles.picGrid}>
-              {PROFILE_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[
-                    styles.picOption,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor:
-                        profilePic === option.src
-                          ? colors.primaryButton
-                          : "transparent",
-                    },
-                  ]}
-                  onPress={() => selectNewProfilePic(option)}
-                  activeOpacity={0.8}
-                >
-                  <Image
-                    source={option.src}
-                    style={styles.picOptionImage}
-                    contentFit="contain"
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
-      {/* MODALS END */}
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <View style={styles.greetingContainer}>
-            <View style={styles.greetingTextWrapper}>
-              <Text style={[styles.greetingName, { color: colors.text }]}>
-                Hi, {firstName} {emoji}
-              </Text>
-              <Text style={[styles.greetingTime, { color: colors.text }]}>
-                {greeting}
-              </Text>
-            </View>
-            <Text style={[styles.subtitle, { color: colors.subtext }]}>
-              What would you like to order today?
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.profileButton,
-              {
-                backgroundColor: colors.primaryButton,
-                borderColor: colors.primaryButton,
-              },
-            ]}
-            activeOpacity={0.8}
-            onPress={() => setMenuVisible(true)}
-          >
-            <Image
-              source={profilePic}
-              style={styles.profileImage}
-              contentFit="cover"
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* 👇 UPDATED WIDGET: Routes to /machine-info if paired, otherwise /setup */}
-        <TouchableOpacity
-          style={[
-            styles.widgetContainer,
-            { backgroundColor: colors.widgetBackground },
-          ]}
-          onPress={() => router.push(isPaired ? "/machine-info" : "/setup")}
-          activeOpacity={0.9}
-        >
-          <View style={styles.widgetHeader}>
-            <View style={styles.widgetTitleContainer}>
-              <Text style={[styles.widgetTitle, { color: colors.widgetText }]}>
-                {isPaired ? "PourOver1" : "No Machine"}
-              </Text>
-              <View
-                style={[styles.statusBadge, { backgroundColor: statusColor }]}
-              >
-                <Text style={styles.statusText}>{statusText}</Text>
-              </View>
-            </View>
-            <ChevronRight size={24} color={colors.widgetText} />
-          </View>
-
-          <View
-            style={[
-              styles.machineContent,
-              { backgroundColor: isDark ? "#A9612F" : "#C27A45" },
-            ]}
-          >
-            <View style={styles.machineImageWrapper}>
-              <Image
-                source={require("../../assets/images/PO1.png")}
-                style={styles.machineImage}
-                contentFit="contain"
-              />
-            </View>
-
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <View
-                  style={[
-                    styles.statCircle,
-                    machineData?.waterLevelWarning
-                      ? styles.statCritical
-                      : { backgroundColor: "rgba(255,255,255,0.2)" },
-                  ]}
-                >
-                  <Droplet
-                    size={14}
-                    color={machineData?.waterLevelWarning ? "#e72020" : "#000"}
-                  />
-                </View>
-                <Text style={styles.statLabel}>
-                  {machineData?.waterLevel ?? "--"}%
-                </Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <View
-                  style={[
-                    styles.statCircle,
-                    { backgroundColor: "rgba(255,255,255,0.2)" },
-                  ]}
-                >
-                  <Bean size={14} color="#000" />
-                </View>
-                <Text style={styles.statLabel}>
-                  {machineData?.beanLevel ?? "--"}%
-                </Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <View
-                  style={[
-                    styles.statCircle,
-                    { backgroundColor: "rgba(255,255,255,0.2)" },
-                  ]}
-                >
-                  {/* Changed Sparkles to Thermometer */}
-                  <Thermometer size={14} color="#000" />
-                </View>
-                {/* Changed waterTemperature to boilerTemp */}
-                <Text style={styles.statLabel}>
-                  {machineData?.boilerTemp ?? "--"}°C
-                </Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <View
-                  style={[
-                    styles.statCircle,
-                    { backgroundColor: "rgba(255,255,255,0.2)" },
-                  ]}
-                >
-                  <Coffee size={14} color="#000" />
-                </View>
-                <Text style={styles.statLabel}>
-                  {machineData?.status
-                    ? machineData.status.charAt(0).toUpperCase() +
-                      machineData.status.slice(1)
-                    : "--"}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Recommended
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {/* Recommend Cards */}
-            <TouchableOpacity
-              style={[styles.recommendCard, { backgroundColor: colors.card }]}
-              onPress={() =>
-                router.push({
-                  pathname: "/coffee-details",
-                  params: { name: "Medium Coffee", strength: "Medium" },
-                })
-              }
-              activeOpacity={0.8}
-            >
-              <Image
-                source={require("../../assets/images/CreamLatteCoffeeIcon.png")}
-                style={styles.recommendImage}
-                contentFit="contain"
-              />
-              <View style={styles.recommendTextContainer}>
+            <View style={styles.recipeList}>
+              {savedRecipes.length === 0 ? (
                 <Text
-                  style={[styles.recommendTitle, { color: colors.cardHeader }]}
+                  style={{
+                    color: colors.subtext,
+                    fontStyle: "italic",
+                    paddingVertical: 10,
+                  }}
                 >
-                  Medium Coffee
+                  You haven't saved any recipes yet. Tap the + to create one!
                 </Text>
-                <Text
-                  style={[
-                    styles.recommendSubtitle,
-                    { color: colors.cardSubtext },
-                  ]}
-                >
-                  Medium
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.recommendCard, { backgroundColor: colors.card }]}
-              onPress={() =>
-                router.push({
-                  pathname: "/coffee-details",
-                  params: { name: "Dark Coffee", strength: "Strong" },
-                })
-              }
-              activeOpacity={0.8}
-            >
-              <Image
-                source={require("../../assets/images/DarkCoffeeIcon.png")}
-                style={styles.recommendImage}
-                contentFit="contain"
-              />
-              <View style={styles.recommendTextContainer}>
-                <Text
-                  style={[styles.recommendTitle, { color: colors.cardHeader }]}
-                >
-                  Dark Coffee
-                </Text>
-                <Text
-                  style={[
-                    styles.recommendSubtitle,
-                    { color: colors.cardSubtext },
-                  ]}
-                >
-                  Strong
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.recommendCard, { backgroundColor: colors.card }]}
-              onPress={() =>
-                router.push({
-                  pathname: "/coffee-details",
-                  params: { name: "Light Coffee", strength: "Light" },
-                })
-              }
-              activeOpacity={0.8}
-            >
-              <Image
-                source={require("../../assets/images/LightCoffeeIcon.png")}
-                style={styles.recommendImage}
-                contentFit="contain"
-              />
-              <View style={styles.recommendTextContainer}>
-                <Text
-                  style={[styles.recommendTitle, { color: colors.cardHeader }]}
-                >
-                  Light Coffee
-                </Text>
-                <Text
-                  style={[
-                    styles.recommendSubtitle,
-                    { color: colors.cardSubtext },
-                  ]}
-                >
-                  Light
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        <View style={styles.sectionContainer}>
-          <View style={styles.recipeHeader}>
-            <Text
-              style={[styles.sectionTitle, { color: colors.widgetBackground }]}
-            >
-              Your Recipes
-            </Text>
-            <TouchableOpacity style={styles.plusButton}>
-              <Plus size={16} color="#000" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.recipeList}>
-            <TouchableOpacity
-              style={[styles.recipeCard, { backgroundColor: colors.card }]}
-            >
-              <View style={styles.recipeRow}>
-                <Image
-                  source={require("../../assets/images/MorningCoffeeIcon.png")}
-                  style={styles.recipeImage}
-                  contentFit="contain"
-                />
-                <View style={styles.recipeInfo}>
-                  <Text
-                    style={[styles.recipeTitle, { color: colors.cardHeader }]}
+              ) : (
+                savedRecipes.map((recipe) => (
+                  <Swipeable
+                    key={recipe.id}
+                    renderRightActions={() => renderRightActions(recipe.id)}
+                    containerStyle={{ overflow: "visible" }}
                   >
-                    Morning
-                  </Text>
-                  <Text
-                    style={[
-                      styles.recipeSubtitle,
-                      { color: colors.cardSubtext },
-                    ]}
-                  >
-                    08:00 AM
-                  </Text>
-                </View>
-                <ChevronRight size={20} color={colors.cardHeader} />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.recipeCard, { backgroundColor: colors.card }]}
-            >
-              <View style={styles.recipeRow}>
-                <Image
-                  source={require("../../assets/images/AfternoonCoffeeIcon.png")}
-                  style={styles.recipeImage}
-                  contentFit="contain"
-                />
-                <View style={styles.recipeInfo}>
-                  <Text
-                    style={[styles.recipeTitle, { color: colors.cardHeader }]}
-                  >
-                    Afternoon
-                  </Text>
-                  <Text
-                    style={[
-                      styles.recipeSubtitle,
-                      { color: colors.cardSubtext },
-                    ]}
-                  >
-                    02:00 PM
-                  </Text>
-                </View>
-                <ChevronRight size={20} color={colors.cardHeader} />
-              </View>
-            </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.recipeCard,
+                        { backgroundColor: colors.card },
+                      ]}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/coffee-details",
+                          // Pass isCustom and recipeId so coffee-details.tsx knows it's a custom recipe
+                          params: {
+                            name: recipe.name,
+                            strength: recipe.strength,
+                            isCustom: "true",
+                            recipeId: recipe.id,
+                          },
+                        })
+                      }
+                    >
+                      <View style={styles.recipeRow}>
+                        <Image
+                          source={require("../../assets/images/MorningCoffeeIcon.png")}
+                          style={styles.recipeImage}
+                          contentFit="contain"
+                        />
+                        <View style={styles.recipeInfo}>
+                          <Text
+                            style={[
+                              styles.recipeTitle,
+                              { color: colors.cardHeader },
+                            ]}
+                          >
+                            {recipe.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.recipeSubtitle,
+                              { color: colors.cardSubtext },
+                            ]}
+                          >
+                            {recipe.strength} • Created at {recipe.time}
+                          </Text>
+                        </View>
+                        <ChevronRight size={20} color={colors.cardHeader} />
+                      </View>
+                    </TouchableOpacity>
+                  </Swipeable>
+                ))
+              )}
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
-      <View style={styles.bottomDecoration} pointerEvents="none">
-        <Image
-          source={require("../../assets/images/Group 1547.svg")}
-          style={styles.decorationImage}
-          contentFit="contain"
-        />
-      </View>
-    </SafeAreaView>
+        <View style={styles.bottomDecoration} pointerEvents="none">
+          <Image
+            source={require("../../assets/images/Group 1547.svg")}
+            style={styles.decorationImage}
+            contentFit="contain"
+          />
+        </View>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -651,7 +730,7 @@ const styles = StyleSheet.create({
   menuContent: {
     marginTop: 80,
     marginRight: 21,
-    width: 230,
+    width: 250,
     borderRadius: 16,
     paddingVertical: 8,
     shadowColor: "#000",
@@ -666,6 +745,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     gap: 12,
+  },
+  menuThemeSection: {
+    paddingVertical: 4,
+  },
+  themeRow: {
+    paddingVertical: 10,
   },
   menuText: { fontSize: 16, fontWeight: "500" },
   menuDivider: { height: 1, width: "100%" },
@@ -817,6 +902,13 @@ const styles = StyleSheet.create({
   recipeInfo: { flex: 1, gap: 2 },
   recipeTitle: { fontSize: 16, fontWeight: "600" },
   recipeSubtitle: { fontSize: 12 },
+  deleteAction: {
+    backgroundColor: "#FF3B30",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    borderRadius: 15,
+  },
   bottomDecoration: {
     alignItems: "flex-end",
     marginTop: -250,

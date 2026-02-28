@@ -1,7 +1,6 @@
-// app/machine-info.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Bean,
   ChevronLeft,
@@ -11,7 +10,7 @@ import {
   Thermometer,
   Trash2,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -31,6 +30,11 @@ export default function MachineInfoScreen() {
 
   const [machineData, setMachineData] = useState<any>(null);
 
+  // --- Dynamic Stats State ---
+  const [cupsMade, setCupsMade] = useState(0);
+  const [daysInUse, setDaysInUse] = useState(0);
+  const [coffeePref, setCoffeePref] = useState("--");
+
   // Poll the machine every 2 seconds for live data
   useEffect(() => {
     const fetchMachine = async () => {
@@ -42,6 +46,37 @@ export default function MachineInfoScreen() {
     const interval = setInterval(fetchMachine, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch Stats dynamically when the screen loads
+  useFocusEffect(
+    useCallback(() => {
+      const loadStats = async () => {
+        // 1. Preference
+        const pref = await AsyncStorage.getItem("user_coffee_pref");
+        if (pref) setCoffeePref(pref);
+
+        // 2. Cups Made
+        const cups = await AsyncStorage.getItem("stats_cups_made");
+        if (cups) setCupsMade(parseInt(cups, 10));
+
+        // 3. Time in Use (Calculate days since first app use/install)
+        let installDateStr = await AsyncStorage.getItem("stats_install_date");
+        if (!installDateStr) {
+          // If it doesn't exist, we set today as the install date
+          installDateStr = Date.now().toString();
+          await AsyncStorage.setItem("stats_install_date", installDateStr);
+        }
+        const installDate = parseInt(installDateStr, 10);
+        const days = Math.floor(
+          (Date.now() - installDate) / (1000 * 60 * 60 * 24),
+        );
+        // Show at least 1 day if it was just installed
+        setDaysInUse(Math.max(1, days));
+      };
+
+      loadStats();
+    }, []),
+  );
 
   const handleUnpair = () => {
     Alert.alert(
@@ -103,7 +138,6 @@ export default function MachineInfoScreen() {
             Summary
           </Text>
 
-          {/* Row 1: Water and Beans */}
           <View style={styles.summaryRow}>
             <View style={styles.taskCard}>
               <View style={styles.iconCircle}>
@@ -130,7 +164,6 @@ export default function MachineInfoScreen() {
             </View>
           </View>
 
-          {/* Row 2: Cup and Temperature */}
           <View style={styles.summaryRow}>
             <View style={styles.taskCard}>
               <View style={styles.iconCircle}>
@@ -142,14 +175,13 @@ export default function MachineInfoScreen() {
               </View>
             </View>
 
-            {/* 👇 Changed from "Next Clean" to Live Temperature! */}
             <View style={styles.taskCard}>
               <View style={styles.iconCircle}>
                 <Thermometer size={20} color="#fff" />
               </View>
               <View style={styles.taskText}>
                 <Text style={styles.taskTitle}>
-                  {machineData?.boilerTemp ?? "--"}°C
+                  {machineData?.boilerTemp ?? "--"}Â°C
                 </Text>
                 <Text style={styles.taskSubtitle}>water temp</Text>
               </View>
@@ -166,11 +198,17 @@ export default function MachineInfoScreen() {
           <View style={styles.statsList}>
             <View style={styles.statRow}>
               <Text style={styles.statLabel}>Made coffee</Text>
-              <Text style={styles.statValue}>476 cups</Text>
+              <Text style={styles.statValue}>{cupsMade} cups</Text>
             </View>
             <View style={styles.statRow}>
               <Text style={styles.statLabel}>Time in use</Text>
-              <Text style={styles.statValue}>94 days</Text>
+              <Text style={styles.statValue}>{daysInUse} days</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Preference</Text>
+              <Text style={styles.statValue}>
+                {isNaN(Number(coffeePref)) ? coffeePref : `Lvl ${coffeePref}`}
+              </Text>
             </View>
           </View>
         </View>
@@ -207,8 +245,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
     gap: 24,
   },
-
-  // --- Header ---
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -231,8 +267,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  // --- Image Section ---
   imageSection: {
     alignItems: "center",
     marginVertical: 10,
@@ -250,8 +284,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 120,
   },
-
-  // --- Summary & Sections ---
   section: {
     gap: 16,
   },
@@ -296,13 +328,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.8,
   },
-
-  // --- Statistics ---
   statsList: {
     borderRadius: 15,
     overflow: "hidden",
-    gap: 1, // Creates a 1px gap between rows
-    backgroundColor: "rgba(0,0,0,0.1)", // Color of the gap lines
+    gap: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
   },
   statRow: {
     flexDirection: "row",
@@ -322,8 +352,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "right",
   },
-
-  // --- Actions ---
   unpairButton: {
     backgroundColor: "#e72020",
     flexDirection: "row",
@@ -339,8 +367,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
-
-  // --- Decoration ---
   bottomDecoration: {
     position: "absolute",
     bottom: -20,
