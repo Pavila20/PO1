@@ -2,89 +2,144 @@
 <html>
   <head>
     <title>ESP32 Pour-Over Simulator</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
     <style>
       body {
-        font-family: sans-serif;
-        background: #131211;
-        color: #f5f3f1;
+        font-family: "Nunito", sans-serif;
+        background: #fdf8f5; /* Soft cream background */
+        color: #5d4037; /* Warm coffee brown */
         padding: 30px;
         max-width: 900px;
         margin: auto;
       }
       .header {
-        margin-bottom: 20px;
+        margin-bottom: 30px;
+        text-align: center;
       }
       .grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 20px;
+        gap: 25px;
       }
       .card {
-        background: #1f1b18;
-        border: 1px solid #3a342f;
-        padding: 25px;
-        border-radius: 16px;
+        background: #ffffff;
+        border: none;
+        padding: 30px;
+        border-radius: 24px;
+        box-shadow: 0 10px 30px rgba(93, 64, 55, 0.08); /* Soft floating shadow */
       }
-      h2,
-      h3 {
-        color: #c67c4e;
+      h2 {
+        color: #8d6e63;
+        font-size: 28px;
+        font-weight: 800;
         margin-top: 0;
       }
+      h3 {
+        color: #a1887f;
+        font-weight: 700;
+        margin-top: 0;
+        border-bottom: 2px dashed #efebe9;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+      }
       .state-display {
-        background: #292522;
+        background: #f5f0ee; /* Very soft gray-brown */
         padding: 20px;
-        border-radius: 12px;
+        border-radius: 16px;
         font-family: monospace;
         white-space: pre-wrap;
-        color: #d7cfc9;
-        border: 1px solid #3a342f;
+        color: #6d4c41;
+        border: 2px solid #efebe9;
+        font-size: 14px;
       }
       .control-group {
-        margin-bottom: 20px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #3a342f;
+        margin-bottom: 25px;
+        padding-bottom: 25px;
+        border-bottom: 2px dashed #efebe9;
+      }
+      .control-group:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+      strong {
+        color: #795548;
+        font-size: 15px;
       }
       button {
-        background: #3a342f;
-        color: #f5f3f1;
+        background: #efebe9;
+        color: #5d4037;
         border: none;
-        padding: 10px 14px;
-        border-radius: 8px;
+        padding: 12px 18px;
+        border-radius: 20px; /* Pill-shaped cute buttons */
         cursor: pointer;
-        margin: 4px;
-        font-weight: 600;
+        margin: 6px 4px;
+        font-weight: 700;
+        font-family: "Nunito", sans-serif;
+        font-size: 13px;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
       }
       button:hover {
-        background: #c67c4e;
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+        background: #d7ccc8;
       }
-      .btn-green {
-        background: #2e7d32;
+      button:active {
+        transform: translateY(1px);
       }
-      .btn-red {
-        background: #c62828;
-      }
-      .btn-warning {
-        background: #f57f17;
-      }
+
+      /* Pastel color overrides for buttons */
       .btn-blue {
-        background: #1976d2;
+        background: #b3e5fc; /* Pastel blue */
+        color: #0277bd;
+      }
+      .btn-blue:hover {
+        background: #81d4fa;
+      }
+
+      .btn-red {
+        background: #ffccbc; /* Pastel coral/red */
+        color: #d84315;
+      }
+      .btn-red:hover {
+        background: #ffab91;
+      }
+
+      .btn-warning {
+        background: #ffe082; /* Pastel yellow/orange */
+        color: #ff8f00;
+      }
+      .btn-warning:hover {
+        background: #ffd54f;
+      }
+
+      .btn-green {
+        background: #c8e6c9; /* Pastel mint green */
+        color: #2e7d32;
+      }
+      .btn-green:hover {
+        background: #a5d6a7;
       }
     </style>
   </head>
   <body>
     <div class="header">
-      <h2>☕ C++ State Machine Override</h2>
+      <h2>☕ ESP-32 Simulator Server ☁️</h2>
     </div>
     <div class="grid">
       <div class="card">
         <h3>📡 Live Hardware Struct</h3>
-        <div id="state-display" class="state-display">Loading...</div>
+        <div id="state-display" class="state-display">Loading... 🐾</div>
       </div>
       <div class="card">
         <h3>🔧 Force State Change</h3>
 
         <div class="control-group">
-          <strong style="display: block; margin-bottom: 8px"
+          <strong style="display: block; margin-bottom: 12px"
             >📍 Sensor 1: Grinder Station</strong
           >
           <button
@@ -102,7 +157,7 @@
         </div>
 
         <div class="control-group">
-          <strong style="display: block; margin-bottom: 8px"
+          <strong style="display: block; margin-bottom: 12px"
             >📍 Sensor 2: Dispenser Station</strong
           >
           <button
@@ -120,8 +175,8 @@
         </div>
 
         <div class="control-group">
-          <strong style="display: block; margin-bottom: 8px"
-            >C++ Enum: MachineStates</strong
+          <strong style="display: block; margin-bottom: 12px"
+            >✨ C++ Enum: MachineStates</strong
           >
           <button onclick="updateState({ status: 'IDLE' })">IDLE</button>
           <button
@@ -154,24 +209,27 @@
         </div>
 
         <div class="control-group">
-          <strong style="display: block; margin-bottom: 8px"
-            >HX711 Load Cells & Dallas Temp</strong
+          <strong style="display: block; margin-bottom: 12px"
+            >🌡️ HX711 Load Cells & Dallas Temp</strong
           >
           <button class="btn-green" onclick="updateState({ waterLevel: 100 })">
-            Fill Water (1000mL)
+            💧 Fill Water (1000mL)
           </button>
           <button class="btn-green" onclick="updateState({ beanLevel: 100 })">
-            Fill Beans (75g)
+            🫘 Fill Beans (75g)
           </button>
           <br />
           <button
             class="btn-red"
             onclick="updateState({ waterTemperature: 105 })"
           >
-            Trigger Overheat (105°C)
+            🔥 Trigger Overheat (105°C)
           </button>
-          <button onclick="updateState({ waterTemperature: 22 })">
-            Cool Down (22°C)
+          <button
+            class="btn-blue"
+            onclick="updateState({ waterTemperature: 22 })"
+          >
+            ❄️ Cool Down (22°C)
           </button>
         </div>
       </div>

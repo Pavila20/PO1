@@ -1,4 +1,3 @@
-// start-dev.js
 const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -12,7 +11,7 @@ const simulator = spawn("node", ["simulator/server.js"], {
 });
 
 // 2. Start Localtunnel to expose port 5000 to the internet
-const tunnel = spawn("npx", ["localtunnel", "--port", "5000"], { shell: true });
+const tunnel = spawn("npx", ["localtunnel", "--port", "8082"], { shell: true });
 
 tunnel.stdout.on("data", (data) => {
   const output = data.toString();
@@ -42,7 +41,7 @@ tunnel.stdout.on("data", (data) => {
     console.log(`🚀 Starting Expo App with Tunnel...\n`);
 
     // 👇 UPDATED: Added '--tunnel' to the arguments array
-    spawn("npx", ["expo", "start", "--tunnel", "-c"], {
+    spawn("npx", ["expo", "start", "--tunnel"], {
       stdio: "inherit",
       shell: true,
     });

@@ -1,10 +1,26 @@
 const MACHINE_URL = process.env.EXPO_PUBLIC_MACHINE_IP;
 
+// Helper function to fetch with a timeout
+async function fetchWithTimeout(resource: string, options: any = {}) {
+  const { timeout = 5000 } = options; // 5 second timeout
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  const response = await fetch(resource, {
+    ...options,
+    signal: controller.signal,
+  });
+  clearTimeout(id);
+
+  return response;
+}
 export async function getMachineStatus() {
   try {
     if (!MACHINE_URL) return null;
 
-    const response = await fetch(`${MACHINE_URL}/status`, {
+    const response = await fetchWithTimeout(`${MACHINE_URL}/status`, {
+      timeout: 5000,
       headers: {
         "Bypass-Tunnel-Reminder": "true",
         "User-Agent": "CustomApp/1.0",
