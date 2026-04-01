@@ -1,3 +1,4 @@
+// app/(tabs)/home.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -34,8 +35,17 @@ import {
 } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
-import { getMachineStatus } from "../../src/api/machine";
-import { getSessionUser, signOutLocal } from "../../src/auth/session";
+import {
+  getMachineStatus,
+  sendMachineCommand,
+} from "../../src/backend/api/machine";
+import { getSessionUser, signOutLocal } from "../../src/backend/auth/session";
+
+// --- NEW CLOUD IMPORTS ---
+import {
+  getUserProfiles,
+  deletePourProfile,
+} from "../../src/backend/api/database";
 
 const PROFILE_OPTIONS = [
   { id: "default", src: require("../../assets/images/dino.png") },
@@ -110,9 +120,18 @@ export default function HomeScreen() {
         const pref = await AsyncStorage.getItem("user_coffee_pref");
         if (pref) setCoffeePref(pref);
 
-        const recipesStr = await AsyncStorage.getItem("user_recipes");
-        if (recipesStr) {
-          setSavedRecipes(JSON.parse(recipesStr));
+        // --- FETCH CLOUD RECIPES ---
+        try {
+          const user = await getSessionUser();
+          if (user) {
+            // Get recipes from DynamoDB using their Cognito Sub ID
+            const cloudRecipes = await getUserProfiles(user.sub);
+            setSavedRecipes(cloudRecipes);
+          }
+        } catch (error) {
+          console.error("Failed to load cloud recipes:", error);
+          // Fallback to empty if offline
+          setSavedRecipes([]);
         }
       };
       loadDynamicData();
@@ -169,11 +188,20 @@ export default function HomeScreen() {
     await AsyncStorage.setItem("user_profile_pic", selectedOption.id);
   };
 
-  // --- DELETE RECIPE LOGIC ---
+  // --- DELETE CLOUD RECIPE LOGIC ---
   const handleDeleteRecipe = async (id: string) => {
-    const updatedRecipes = savedRecipes.filter((recipe) => recipe.id !== id);
-    setSavedRecipes(updatedRecipes);
-    await AsyncStorage.setItem("user_recipes", JSON.stringify(updatedRecipes));
+    try {
+      // 1. Delete from AWS DynamoDB
+      await deletePourProfile(id);
+
+      // 2. Remove from local screen state
+      const updatedRecipes = savedRecipes.filter(
+        (recipe) => recipe.profileId !== id,
+      );
+      setSavedRecipes(updatedRecipes);
+    } catch (error) {
+      Alert.alert("Error", "Could not delete recipe from cloud.");
+    }
   };
 
   const renderRightActions = (id: string) => {
@@ -651,8 +679,10 @@ export default function HomeScreen() {
               ) : (
                 savedRecipes.map((recipe) => (
                   <Swipeable
-                    key={recipe.id}
-                    renderRightActions={() => renderRightActions(recipe.id)}
+                    key={recipe.profileId}
+                    renderRightActions={() =>
+                      renderRightActions(recipe.profileId)
+                    }
                     containerStyle={{ overflow: "visible" }}
                   >
                     <TouchableOpacity
@@ -663,12 +693,11 @@ export default function HomeScreen() {
                       onPress={() =>
                         router.push({
                           pathname: "/coffee-details",
-                          // Pass isCustom and recipeId so coffee-details.tsx knows it's a custom recipe
                           params: {
                             name: recipe.name,
-                            strength: recipe.strength,
+                            strength: recipe.isDefault ? "Standard" : "Custom",
                             isCustom: "true",
-                            recipeId: recipe.id,
+                            recipeId: recipe.profileId,
                           },
                         })
                       }
@@ -694,7 +723,8 @@ export default function HomeScreen() {
                               { color: colors.cardSubtext },
                             ]}
                           >
-                            {recipe.strength} • Created at {recipe.time}
+                            Temp: {recipe.targetTemp}°C • Grind:{" "}
+                            {recipe.grindSize}
                           </Text>
                         </View>
                         <ChevronRight size={20} color={colors.cardHeader} />

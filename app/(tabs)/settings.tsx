@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
-import { signOutLocal } from "../../src/auth/session"; // AWS
+import { signOutLocal } from "../../src/backend/auth/session"; // AWS
 
 export default function SettingsTab() {
   const router = useRouter();

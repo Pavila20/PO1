@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
-import { getMachineStatus } from "../../src/api/machine"; // Import our API
+import { getMachineStatus } from "../../src/backend/api/machine"; // Import our API
 
 export default function SetupSearch() {
   const router = useRouter();

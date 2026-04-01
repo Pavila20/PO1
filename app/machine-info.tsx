@@ -21,7 +21,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
-import { getMachineStatus } from "../src/api/machine";
+import { getMachineStatus } from "../src/backend/api/machine";
 
 export default function MachineInfoScreen() {
   const router = useRouter();

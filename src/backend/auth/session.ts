@@ -39,3 +39,7 @@ export async function signOutLocal() {
   await SecureStore.deleteItemAsync(KEY_ACCESS);
   await SecureStore.deleteItemAsync(KEY_REFRESH);
 }
+export async function getSessionToken(): Promise<string | null> {
+  // We grab the ID token (JWT) to use as the VIP pass for AWS DynamoDB
+  return await SecureStore.getItemAsync(KEY_ID);
+}

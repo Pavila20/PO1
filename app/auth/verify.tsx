@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
-import { confirmSignUp } from "../../src/auth/emailPassword";
+import { confirmSignUp } from "../../src/backend/auth/emailPassword";
 
 export default function VerifyScreen() {
   const router = useRouter();
@@ -69,7 +69,9 @@ export default function VerifyScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.background }]}
+    >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -96,12 +98,17 @@ export default function VerifyScreen() {
                   <View style={styles.headerSection}>
                     <TouchableOpacity
                       onPress={() => router.back()}
-                      style={[styles.circleBackButton, { borderColor: colors.inputBorder }]}
+                      style={[
+                        styles.circleBackButton,
+                        { borderColor: colors.inputBorder },
+                      ]}
                     >
                       <ArrowLeft size={24} color={colors.text} />
                     </TouchableOpacity>
 
-                    <Text style={[styles.title, { color: colors.text }]}>Check your email</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>
+                      Check your email
+                    </Text>
                     <Text style={[styles.subtitle, { color: colors.subtext }]}>
                       We’ve sent the code to your email
                     </Text>
@@ -119,13 +126,18 @@ export default function VerifyScreen() {
                       caretHidden={true}
                     />
 
-                    <Pressable style={styles.codeRow} onPress={() => inputRef.current?.focus()}>
+                    <Pressable
+                      style={styles.codeRow}
+                      onPress={() => inputRef.current?.focus()}
+                    >
                       {[0, 1, 2, 3, 4, 5].map((index) => {
                         const digit = code[index] || "";
                         const isFilled = index < code.length;
                         const isNext = index === code.length;
                         const borderColor =
-                          isNext || isFilled ? colors.primaryButton : colors.inputBorder;
+                          isNext || isFilled
+                            ? colors.primaryButton
+                            : colors.inputBorder;
 
                         return (
                           <View
@@ -138,7 +150,12 @@ export default function VerifyScreen() {
                               },
                             ]}
                           >
-                            <Text style={[styles.boxText, { color: colors.inputText }]}>
+                            <Text
+                              style={[
+                                styles.boxText,
+                                { color: colors.inputText },
+                              ]}
+                            >
                               {digit}
                             </Text>
                           </View>
@@ -148,14 +165,19 @@ export default function VerifyScreen() {
 
                     <Text style={[styles.timerText, { color: colors.subtext }]}>
                       Code expires in:{" "}
-                      <Text style={{ color: colors.primaryButton }}>{formatTime(timer)}</Text>
+                      <Text style={{ color: colors.primaryButton }}>
+                        {formatTime(timer)}
+                      </Text>
                     </Text>
                   </View>
 
                   {/* Actions */}
                   <View style={styles.actionSection}>
                     <TouchableOpacity
-                      style={[styles.verifyButton, { backgroundColor: colors.primaryButton }]}
+                      style={[
+                        styles.verifyButton,
+                        { backgroundColor: colors.primaryButton },
+                      ]}
                       onPress={handleConfirm}
                       disabled={loading}
                     >
@@ -163,7 +185,10 @@ export default function VerifyScreen() {
                         <ActivityIndicator color={colors.primaryButtonText} />
                       ) : (
                         <Text
-                          style={[styles.verifyButtonText, { color: colors.primaryButtonText }]}
+                          style={[
+                            styles.verifyButtonText,
+                            { color: colors.primaryButtonText },
+                          ]}
                         >
                           Verify
                         </Text>
@@ -179,7 +204,12 @@ export default function VerifyScreen() {
                         },
                       ]}
                     >
-                      <Text style={[styles.resendButtonText, { color: colors.socialButtonText }]}>
+                      <Text
+                        style={[
+                          styles.resendButtonText,
+                          { color: colors.socialButtonText },
+                        ]}
+                      >
                         Send again
                       </Text>
                     </TouchableOpacity>
@@ -187,7 +217,10 @@ export default function VerifyScreen() {
                 </View>
 
                 {/* FIX: pointerEvents="none" added so clicks pass through to buttons */}
-                <View style={styles.decorativeImageContainer} pointerEvents="none">
+                <View
+                  style={styles.decorativeImageContainer}
+                  pointerEvents="none"
+                >
                   <Image
                     source={require("../../assets/images/Group 1547.svg")}
                     style={styles.decorativeImage}
@@ -209,8 +242,18 @@ const styles = StyleSheet.create({
   card: { width: "100%", maxWidth: 480, alignSelf: "center" },
   topIllustration: { width: "100%", aspectRatio: 1.52, marginTop: -60 },
   contentContainer: { width: "100%", paddingHorizontal: 24 },
-  innerContent: { width: "100%", maxWidth: 340, alignSelf: "center", alignItems: "center" },
-  headerSection: { width: "100%", alignItems: "center", marginBottom: 30, position: "relative" },
+  innerContent: {
+    width: "100%",
+    maxWidth: 340,
+    alignSelf: "center",
+    alignItems: "center",
+  },
+  headerSection: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 30,
+    position: "relative",
+  },
   circleBackButton: {
     position: "absolute",
     left: 0,
@@ -223,11 +266,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 20,
   },
-  title: { fontSize: 20, fontWeight: "800", textAlign: "center", lineHeight: 35 },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 35,
+  },
   subtitle: { fontSize: 14, textAlign: "center", marginTop: 5 },
   inputSection: { width: "100%", alignItems: "center", gap: 15 },
   hiddenInput: { position: "absolute", width: 1, height: 1, opacity: 0 },
-  codeRow: { flexDirection: "row", gap: 8, justifyContent: "center", width: "100%" },
+  codeRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    width: "100%",
+  },
   box: {
     width: 45,
     height: 55,
@@ -238,7 +291,12 @@ const styles = StyleSheet.create({
   },
   boxText: { fontSize: 24, fontWeight: "600" },
   timerText: { fontSize: 15, marginTop: 5, textAlign: "center" },
-  actionSection: { width: "100%", alignItems: "center", gap: 13, marginTop: 30 },
+  actionSection: {
+    width: "100%",
+    alignItems: "center",
+    gap: 13,
+    marginTop: 30,
+  },
   verifyButton: {
     width: 250,
     height: 55,

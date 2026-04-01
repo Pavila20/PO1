@@ -43,7 +43,7 @@ app.get("/status", (req, res) => {
   res.json(machineState);
 });
 
-// 👇 NEW: Step-by-Step Command Handler
+//  NEW: Step-by-Step Command Handler
 app.post("/command", (req, res) => {
   const { command } = req.body;
   console.log(`🤖 APP COMMAND RECEIVED: ${command}`);

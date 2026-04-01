@@ -5,15 +5,18 @@ import { StatusBar } from "expo-status-bar";
 import LottieView from "lottie-react-native";
 import { useEffect, useState } from "react";
 import {
-    Dimensions,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { getMachineStatus, sendMachineCommand } from "../src/api/machine";
+import {
+  getMachineStatus,
+  sendMachineCommand,
+} from "../src/backend/api/machine";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 

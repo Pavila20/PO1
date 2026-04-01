@@ -6,14 +6,19 @@ import { StatusBar } from "expo-status-bar";
 import { ArrowLeft } from "lucide-react-native";
 import { useState } from "react";
 import {
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
+// --- NEW IMPORTS FOR AWS & ALGORITHM ---
+import { saveBrewRating, savePourProfile } from "../src/backend/api/database";
+import { calculateNewProfile } from "../src/backend/core/algorithm";
+import { PourProfile } from "../src/models/types";
+import { getSessionUser } from "../src/backend/auth/session";
 export default function QARatingScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
@@ -38,8 +43,63 @@ export default function QARatingScreen() {
   if (strength === "Too Strong") recommendation = "Light";
 
   const handleContinue = async () => {
-    // Save the recommended strength as their new preference!
+    // 1. Save the recommended strength locally for UI purposes
     await AsyncStorage.setItem("user_coffee_pref", recommendation);
+
+    try {
+      // --- NEW: Grab your REAL AWS Cognito User ID ---
+      const user = await getSessionUser();
+      const realUserId = user?.sub || "unknown-user";
+
+      // 2. Mock the profile that was just brewed
+      // (In the future, pass this from active-brew.tsx via router params)
+      const currentProfileUsed: PourProfile = {
+        profileId: "recipe-123",
+        userId: realUserId, // <--- Now using your REAL ID!
+        name: "Standard Pour",
+        targetTemp: 200,
+        grindSize: 15,
+        waterVolume: 250,
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      // 3. Map the UI string to our strict TypeScript algorithm string
+      const strengthMapped =
+        strength === "Too Weak"
+          ? "Too weak"
+          : strength === "Too Strong"
+            ? "Too strong"
+            : "Just right";
+
+      // 4. Save the Rating to AWS DynamoDB
+      await saveBrewRating({
+        userId: currentProfileUsed.userId,
+        profileId: currentProfileUsed.profileId,
+        rating: score,
+        perceivedStrength: strengthMapped,
+      });
+
+      // 5. Run the Reinforcement Learning Algorithm!
+      const optimizedRecipe = calculateNewProfile(
+        currentProfileUsed,
+        score,
+        strengthMapped,
+      );
+
+      // 6. If the algorithm changed the recipe, save the new one to AWS
+      if (
+        optimizedRecipe.name.includes("Auto-Adjusted") ||
+        optimizedRecipe.name.includes("Perfected")
+      ) {
+        await savePourProfile(optimizedRecipe);
+        console.log("New optimized recipe saved to AWS!");
+      }
+    } catch (error) {
+      console.error("Failed to sync feedback with AWS:", error);
+    }
+
+    // Move to Step 2 UI
     setStep(2);
   };
 

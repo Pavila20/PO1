@@ -19,8 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext"; // <--- Import useTheme
 
 // --- AWS Auth Imports ---
-import { signInWithGoogle } from "../../src/auth/cognitoGoogle";
-import { signInEmailPassword } from "../../src/auth/emailPassword";
+import { signInWithGoogle } from "../../src/backend/auth/cognitoGoogle";
+import { signInEmailPassword } from "../../src/backend/auth/emailPassword";
 
 // --- Sub-Components ---
 

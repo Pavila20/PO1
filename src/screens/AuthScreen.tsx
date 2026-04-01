@@ -1,7 +1,20 @@
 import React from "react";
-import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-native";
-import { signInWithGoogle } from "../auth/cognitoGoogle";
-import { signInEmailPassword, signUpEmailPassword, confirmSignUp, resendConfirmationCode, isValidEmail, isStrongPassword } from "../auth/emailPassword";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ActivityIndicator,
+} from "react-native";
+import { signInWithGoogle } from "../backend/auth/cognitoGoogle";
+import {
+  signInEmailPassword,
+  signUpEmailPassword,
+  confirmSignUp,
+  resendConfirmationCode,
+  isValidEmail,
+  isStrongPassword,
+} from "../backend/auth/emailPassword";
 
 type Tab = "login" | "signup" | "confirm";
 
@@ -47,7 +60,9 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => Promise<void> }) {
       // common Cognito message
       const msg = err?.message ?? "Email login failed.";
       if (msg.toLowerCase().includes("not confirmed")) {
-        setInfo("Your email isn’t confirmed yet. Enter the code we emailed you.");
+        setInfo(
+          "Your email isn’t confirmed yet. Enter the code we emailed you.",
+        );
         setTab("confirm");
       } else {
         setError(msg);
@@ -63,7 +78,9 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => Promise<void> }) {
 
     if (!isValidEmail(e)) return setError("Enter a valid email.");
     if (!isStrongPassword(password)) {
-      return setError("Password must be 8+ chars with upper/lower/number/special.");
+      return setError(
+        "Password must be 8+ chars with upper/lower/number/special.",
+      );
     }
 
     setBusy(true);
@@ -118,7 +135,9 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => Promise<void> }) {
   return (
     <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
       <Text style={{ fontSize: 24, marginBottom: 6 }}>Pour Over</Text>
-      <Text style={{ opacity: 0.7, marginBottom: 16 }}>Sign in to control your machine and schedules.</Text>
+      <Text style={{ opacity: 0.7, marginBottom: 16 }}>
+        Sign in to control your machine and schedules.
+      </Text>
 
       {/* Google */}
       <Pressable
@@ -165,8 +184,12 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => Promise<void> }) {
       </View>
 
       {/* Messages */}
-      {!!error && <Text style={{ color: "#b00020", marginBottom: 10 }}>{error}</Text>}
-      {!!info && <Text style={{ color: "#0a7a2f", marginBottom: 10 }}>{info}</Text>}
+      {!!error && (
+        <Text style={{ color: "#b00020", marginBottom: 10 }}>{error}</Text>
+      )}
+      {!!info && (
+        <Text style={{ color: "#0a7a2f", marginBottom: 10 }}>{info}</Text>
+      )}
 
       {/* Form */}
       <Text style={{ marginBottom: 6, opacity: 0.7 }}>Email</Text>
@@ -204,7 +227,9 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => Promise<void> }) {
         </>
       ) : (
         <>
-          <Text style={{ marginBottom: 6, opacity: 0.7 }}>Confirmation code</Text>
+          <Text style={{ marginBottom: 6, opacity: 0.7 }}>
+            Confirmation code
+          </Text>
           <TextInput
             value={code}
             onChangeText={setCode}
@@ -237,12 +262,26 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => Promise<void> }) {
           marginBottom: 12,
         }}
       >
-        {busy ? <ActivityIndicator /> : <Text style={{ color: "white", fontSize: 16 }}>{tab === "login" ? "Login" : tab === "signup" ? "Create account" : "Confirm email"}</Text>}
+        {busy ? (
+          <ActivityIndicator />
+        ) : (
+          <Text style={{ color: "white", fontSize: 16 }}>
+            {tab === "login"
+              ? "Login"
+              : tab === "signup"
+                ? "Create account"
+                : "Confirm email"}
+          </Text>
+        )}
       </Pressable>
 
       {/* Secondary actions */}
       {tab === "confirm" && (
-        <Pressable onPress={handleResend} disabled={busy} style={{ padding: 10, alignItems: "center" }}>
+        <Pressable
+          onPress={handleResend}
+          disabled={busy}
+          style={{ padding: 10, alignItems: "center" }}
+        >
           <Text style={{ opacity: 0.8 }}>Resend code</Text>
         </Pressable>
       )}
@@ -250,7 +289,15 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => Promise<void> }) {
   );
 }
 
-function TabButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function TabButton({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}

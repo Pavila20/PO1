@@ -25,8 +25,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 
 // --- Auth Imports ---
-import { signInWithGoogle } from "../../src/auth/cognitoGoogle";
-import { signUpEmailPassword } from "../../src/auth/emailPassword";
+import { signInWithGoogle } from "../../src/backend/auth/cognitoGoogle";
+import { signUpEmailPassword } from "../../src/backend/auth/emailPassword";
 
 interface HeaderProps {
   title: string;

@@ -6,16 +6,21 @@ import { StatusBar } from "expo-status-bar";
 import { ArrowLeft, Beaker } from "lucide-react-native";
 import { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Alert,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+
+// --- NEW CLOUD IMPORTS ---
+import { savePourProfile } from "../src/backend/api/database";
+import { getSessionUser } from "../src/backend/auth/session";
 
 export default function CreateRecipeScreen() {
   const router = useRouter();
@@ -24,6 +29,7 @@ export default function CreateRecipeScreen() {
 
   const [recipeName, setRecipeName] = useState("");
   const [sliderValue, setSliderValue] = useState(8); // Default to middle value (8)
+  const [isSaving, setIsSaving] = useState(false);
 
   // Theme Colors
   const bgColor = isDark ? colors.background : "#FFF1E5";
@@ -35,27 +41,39 @@ export default function CreateRecipeScreen() {
   const trackBgColor = isDark ? "#333333" : "#E5E5E5";
 
   const handleSave = async () => {
-    // 1. Save new recipe
-    const newRecipe = {
-      id: Date.now().toString(),
-      name: recipeName,
-      strength: `Strength: ${sliderValue}`,
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
+    setIsSaving(true);
+    try {
+      // 1. Get the real user ID from Cognito
+      const user = await getSessionUser();
+      const realUserId = user?.sub || "unknown-user";
 
-    const existingStr = await AsyncStorage.getItem("user_recipes");
-    const recipes = existingStr ? JSON.parse(existingStr) : [];
-    recipes.push(newRecipe);
+      // 2. Convert the 1-15 slider into real machine parameters
+      // Weak (1): Cooler water (191F), Coarse grind (29)
+      // Strong (15): Hotter water (205F), Fine grind (15)
+      const calculatedTemp = Math.round(190 + sliderValue);
+      const calculatedGrind = Math.round(30 - sliderValue);
 
-    await AsyncStorage.setItem("user_recipes", JSON.stringify(recipes));
+      // 3. Save to AWS DynamoDB
+      await savePourProfile({
+        userId: realUserId,
+        name: recipeName.trim(),
+        targetTemp: calculatedTemp,
+        grindSize: calculatedGrind,
+        waterVolume: 250,
+        isDefault: false,
+      });
 
-    // 2. Save this as their new overall preference (storing the number)
-    await AsyncStorage.setItem("user_coffee_pref", sliderValue.toString());
+      // 4. Save this as their new overall preference locally
+      await AsyncStorage.setItem("user_coffee_pref", sliderValue.toString());
 
-    router.replace("/(tabs)/home");
+      // 5. Go back to home
+      router.replace("/(tabs)/home");
+    } catch (error) {
+      console.error("Failed to save recipe to cloud:", error);
+      Alert.alert("Error", "Could not save your recipe to the cloud.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -70,6 +88,7 @@ export default function CreateRecipeScreen() {
             style={[styles.backButton, { backgroundColor: btnBgColor }]}
             onPress={() => router.back()}
             activeOpacity={0.8}
+            disabled={isSaving}
           >
             <ArrowLeft color={btnTextColor} size={24} />
           </TouchableOpacity>
@@ -134,15 +153,18 @@ export default function CreateRecipeScreen() {
           <TouchableOpacity
             style={[styles.primaryBtn, { backgroundColor: btnBgColor }]}
             onPress={handleSave}
-            disabled={!recipeName.trim()}
+            disabled={!recipeName.trim() || isSaving}
           >
             <Text
               style={[
                 styles.primaryBtnText,
-                { color: btnTextColor, opacity: recipeName.trim() ? 1 : 0.5 },
+                {
+                  color: btnTextColor,
+                  opacity: !recipeName.trim() || isSaving ? 0.5 : 1,
+                },
               ]}
             >
-              Save Recipe
+              {isSaving ? "Saving to Cloud..." : "Save Recipe"}
             </Text>
           </TouchableOpacity>
         </View>

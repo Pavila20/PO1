@@ -14,8 +14,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { signInWithGoogle } from "../src/auth/cognitoGoogle";
-import { isLoggedIn } from "../src/auth/session";
+import { signInWithGoogle } from "../src/backend/auth/cognitoGoogle";
+import { isLoggedIn } from "../src/backend/auth/session";
 
 export default function Welcome() {
   const router = useRouter();
