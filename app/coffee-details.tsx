@@ -2,11 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowLeft, Trash2 } from "lucide-react-native";
 import { MotiView } from "moti";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -144,11 +144,7 @@ export default function CoffeeDetailsScreen() {
 
   const { name, strength, isCustom, recipeId } = useLocalSearchParams();
   const coffeeName = (name as string) || "Light Coffee";
-
-  // Use a generic cup icon if the name isn't recognized
-  const coffeeImage =
-    coffeeImages[coffeeName] ||
-    require("../assets/images/MorningCoffeeIcon.png");
+  const coffeeImage = require("../assets/images/MorningCoffeeIcon.png"); // Using your smart coffee image
 
   const isDark = theme === "dark";
 
@@ -156,26 +152,30 @@ export default function CoffeeDetailsScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  // Parse bitterness from the "Strength: 8" text if it's a custom recipe
-  let bitterness: BitternessLevel = "Low";
-  if (
-    strength === "Strong" ||
-    (strength as string)?.includes("12") ||
-    (strength as string)?.includes("13") ||
-    (strength as string)?.includes("14") ||
-    (strength as string)?.includes("15")
-  ) {
-    bitterness = "High";
-  } else if (
-    strength === "Medium" ||
-    (strength as string)?.includes("7") ||
-    (strength as string)?.includes("8") ||
-    (strength as string)?.includes("9") ||
-    (strength as string)?.includes("10") ||
-    (strength as string)?.includes("11")
-  ) {
-    bitterness = "Medium";
-  }
+  // --- NEW: State for Bitterness and Number ---
+  const [bitterness, setBitterness] = useState<BitternessLevel>("Medium");
+  const [prefNumber, setPrefNumber] = useState<number>(8); // Default
+
+  // --- NEW: Pull the 1-15 number dynamically! ---
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadBitterness = async () => {
+        const prefStr = await AsyncStorage.getItem("user_coffee_pref");
+        if (prefStr) {
+          const num = parseInt(prefStr, 10);
+          if (!isNaN(num)) {
+            setPrefNumber(num);
+            // Highlight the correct bean mathematically
+            if (num <= 5) setBitterness("Low");
+            else if (num <= 10) setBitterness("Medium");
+            else setBitterness("High");
+          }
+        }
+      };
+      loadBitterness();
+    }, []),
+  );
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[] }) => {
@@ -198,7 +198,13 @@ export default function CoffeeDetailsScreen() {
     setCurrentIndex(0);
     router.replace({
       pathname: "/active-brew",
-      params: { name: coffeeName, strength: strength as string },
+      // --- UPDATE: Pass all the data forward! ---
+      params: {
+        name: coffeeName,
+        strength: strength as string,
+        isCustom: isCustom as string,
+        recipeId: recipeId as string,
+      },
     });
   };
 
@@ -416,8 +422,9 @@ export default function CoffeeDetailsScreen() {
             <Text style={[styles.sectionTitle, { color: textColor }]}>
               Coffee Information
             </Text>
+            {/* Show the actual 1-15 number here! */}
             <Text style={[styles.bitternessTitle, { color: textColor }]}>
-              Bitterness
+              Bitterness Level: {prefNumber}/15
             </Text>
           </View>
 

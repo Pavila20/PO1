@@ -14,22 +14,21 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
-// --- NEW IMPORTS FOR AWS & ALGORITHM ---
 import { saveBrewRating, savePourProfile } from "../src/backend/api/database";
+import { getSessionUser } from "../src/backend/auth/session";
 import { calculateNewProfile } from "../src/backend/core/algorithm";
 import { PourProfile } from "../src/models/types";
-import { getSessionUser } from "../src/backend/auth/session";
+
 export default function QARatingScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const isDark = theme === "dark";
 
-  // State
   const [step, setStep] = useState<1 | 2>(1);
-  const [score, setScore] = useState(8); // Default score
+  const [score, setScore] = useState(12);
   const [strength, setStrength] = useState("Perfect");
+  const [savedUserId, setSavedUserId] = useState<string>("unknown-user");
 
-  // Theme Colors
   const bgColor = isDark ? colors.background : "#FFF1E5";
   const textColor = isDark ? colors.text : "#9C4400";
   const subtextColor = isDark ? colors.subtext : "#896D59";
@@ -37,34 +36,25 @@ export default function QARatingScreen() {
   const btnTextColor = isDark ? "#F0CEAB" : "#000000";
   const trackBgColor = isDark ? "#333333" : "#E5E5E5";
 
-  // Determine recommendation based on feedback
-  let recommendation = "Medium";
-  if (strength === "Too Weak") recommendation = "Strong";
-  if (strength === "Too Strong") recommendation = "Light";
-
   const handleContinue = async () => {
-    // 1. Save the recommended strength locally for UI purposes
-    await AsyncStorage.setItem("user_coffee_pref", recommendation);
+    await AsyncStorage.setItem("user_coffee_pref", score.toString());
 
     try {
-      // --- NEW: Grab your REAL AWS Cognito User ID ---
       const user = await getSessionUser();
       const realUserId = user?.sub || "unknown-user";
+      setSavedUserId(realUserId);
 
-      // 2. Mock the profile that was just brewed
-      // (In the future, pass this from active-brew.tsx via router params)
       const currentProfileUsed: PourProfile = {
-        profileId: "recipe-123",
-        userId: realUserId, // <--- Now using your REAL ID!
-        name: "Standard Pour",
+        profileId: `ai-optimized-${realUserId}`,
+        userId: realUserId,
+        name: "My Perfect Cup",
         targetTemp: 200,
         grindSize: 15,
         waterVolume: 250,
-        isDefault: true,
+        isDefault: false,
         createdAt: new Date().toISOString(),
       };
 
-      // 3. Map the UI string to our strict TypeScript algorithm string
       const strengthMapped =
         strength === "Too Weak"
           ? "Too weak"
@@ -72,7 +62,6 @@ export default function QARatingScreen() {
             ? "Too strong"
             : "Just right";
 
-      // 4. Save the Rating to AWS DynamoDB
       await saveBrewRating({
         userId: currentProfileUsed.userId,
         profileId: currentProfileUsed.profileId,
@@ -80,26 +69,21 @@ export default function QARatingScreen() {
         perceivedStrength: strengthMapped,
       });
 
-      // 5. Run the Reinforcement Learning Algorithm!
       const optimizedRecipe = calculateNewProfile(
         currentProfileUsed,
         score,
         strengthMapped,
       );
 
-      // 6. If the algorithm changed the recipe, save the new one to AWS
-      if (
-        optimizedRecipe.name.includes("Auto-Adjusted") ||
-        optimizedRecipe.name.includes("Perfected")
-      ) {
-        await savePourProfile(optimizedRecipe);
-        console.log("New optimized recipe saved to AWS!");
-      }
+      optimizedRecipe.profileId = `ai-optimized-${realUserId}`;
+      optimizedRecipe.name = "My Perfect Cup";
+
+      await savePourProfile(optimizedRecipe);
+      console.log("Smart Cup updated in AWS!");
     } catch (error) {
       console.error("Failed to sync feedback with AWS:", error);
     }
 
-    // Move to Step 2 UI
     setStep(2);
   };
 
@@ -107,7 +91,6 @@ export default function QARatingScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity
           style={[styles.backButton, { backgroundColor: btnBgColor }]}
@@ -123,20 +106,17 @@ export default function QARatingScreen() {
       <View style={styles.content}>
         {step === 1 ? (
           <>
-            {/* Question 1: Rating Slider (Now 1 to 10) */}
             <View style={styles.questionBlock}>
               <Text style={[styles.questionText, { color: textColor }]}>
-                From 1 to 10, how much did you enjoy the drink?
+                From 1 to 15, how much did you enjoy the drink?
               </Text>
-
               <Text style={[styles.scoreText, { color: textColor }]}>
                 {score}
               </Text>
-
               <Slider
                 style={{ width: "100%", height: 40 }}
                 minimumValue={1}
-                maximumValue={10}
+                maximumValue={15}
                 step={1}
                 value={score}
                 onValueChange={setScore}
@@ -146,7 +126,6 @@ export default function QARatingScreen() {
               />
             </View>
 
-            {/* Question 2: Strength */}
             <View style={styles.questionBlock}>
               <Text style={[styles.questionText, { color: textColor }]}>
                 How was the strength of your coffee?
@@ -197,34 +176,36 @@ export default function QARatingScreen() {
           </>
         ) : (
           <>
-            {/* Step 2: Recommendation */}
             <View style={styles.recommendationBlock}>
               <Text style={[styles.recommendTitle, { color: textColor }]}>
                 Thanks for your feedback!
               </Text>
               <Text style={[styles.recommendSub, { color: subtextColor }]}>
-                Based on your rating, your next recommended drink is:
+                Your machine has learned from this and automatically adjusted
+                "My Perfect Cup" for next time.
               </Text>
-              <View
-                style={[styles.recommendCard, { backgroundColor: btnBgColor }]}
-              >
-                <Text
-                  style={[styles.recommendCoffeeText, { color: btnTextColor }]}
-                >
-                  {recommendation} Coffee
-                </Text>
-              </View>
             </View>
 
             <View style={styles.actionBlock}>
               <TouchableOpacity
                 style={[styles.secondaryBtn, { borderColor: btnBgColor }]}
-                onPress={() => router.push("/create-recipe")}
+                onPress={() =>
+                  router.replace({
+                    pathname: "/active-brew",
+                    params: {
+                      name: "My Perfect Cup",
+                      strength: "Custom",
+                      isCustom: "true",
+                      recipeId: `ai-optimized-${savedUserId}`,
+                    },
+                  })
+                }
               >
                 <Text style={[styles.secondaryBtnText, { color: textColor }]}>
-                  Create Your Own Coffee
+                  Brew Updated Cup
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.primaryBtn, { backgroundColor: btnBgColor }]}
                 onPress={() => router.replace("/(tabs)/home")}
@@ -296,13 +277,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 15,
   },
-  recommendSub: { fontSize: 16, textAlign: "center", marginBottom: 30 },
-  recommendCard: {
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    borderRadius: 20,
+  recommendSub: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 30,
+    lineHeight: 24,
   },
-  recommendCoffeeText: { fontSize: 24, fontWeight: "800" },
   actionBlock: { gap: 15 },
   primaryBtn: {
     width: "100%",
@@ -312,7 +292,6 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { fontSize: 18, fontWeight: "800" },
   secondaryBtn: {
-    width: "100%",
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: "center",

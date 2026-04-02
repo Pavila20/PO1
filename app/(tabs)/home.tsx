@@ -10,7 +10,6 @@ import {
   Droplet,
   LogOut,
   Moon,
-  Plus,
   Smartphone,
   Sun,
   Thermometer,
@@ -35,16 +34,12 @@ import {
 } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
-import {
-  getMachineStatus,
-  sendMachineCommand,
-} from "../../src/backend/api/machine";
+import { getMachineStatus } from "../../src/backend/api/machine";
 import { getSessionUser, signOutLocal } from "../../src/backend/auth/session";
 
-// --- NEW CLOUD IMPORTS ---
 import {
-  getUserProfiles,
   deletePourProfile,
+  getUserProfiles,
 } from "../../src/backend/api/database";
 
 const PROFILE_OPTIONS = [
@@ -120,17 +115,14 @@ export default function HomeScreen() {
         const pref = await AsyncStorage.getItem("user_coffee_pref");
         if (pref) setCoffeePref(pref);
 
-        // --- FETCH CLOUD RECIPES ---
         try {
           const user = await getSessionUser();
           if (user) {
-            // Get recipes from DynamoDB using their Cognito Sub ID
             const cloudRecipes = await getUserProfiles(user.sub);
             setSavedRecipes(cloudRecipes);
           }
         } catch (error) {
           console.error("Failed to load cloud recipes:", error);
-          // Fallback to empty if offline
           setSavedRecipes([]);
         }
       };
@@ -188,13 +180,9 @@ export default function HomeScreen() {
     await AsyncStorage.setItem("user_profile_pic", selectedOption.id);
   };
 
-  // --- DELETE CLOUD RECIPE LOGIC ---
   const handleDeleteRecipe = async (id: string) => {
     try {
-      // 1. Delete from AWS DynamoDB
       await deletePourProfile(id);
-
-      // 2. Remove from local screen state
       const updatedRecipes = savedRecipes.filter(
         (recipe) => recipe.profileId !== id,
       );
@@ -532,122 +520,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <View style={styles.sectionContainer}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Recommended
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
-            >
-              <TouchableOpacity
-                style={[styles.recommendCard, { backgroundColor: colors.card }]}
-                onPress={() =>
-                  router.push({
-                    pathname: "/coffee-details",
-                    params: { name: "Medium Coffee", strength: "Medium" },
-                  })
-                }
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={require("../../assets/images/CreamLatteCoffeeIcon.png")}
-                  style={styles.recommendImage}
-                  contentFit="contain"
-                />
-                <View style={styles.recommendTextContainer}>
-                  <Text
-                    style={[
-                      styles.recommendTitle,
-                      { color: colors.cardHeader },
-                    ]}
-                  >
-                    Medium Coffee
-                  </Text>
-                  <Text
-                    style={[
-                      styles.recommendSubtitle,
-                      { color: colors.cardSubtext },
-                    ]}
-                  >
-                    Medium
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.recommendCard, { backgroundColor: colors.card }]}
-                onPress={() =>
-                  router.push({
-                    pathname: "/coffee-details",
-                    params: { name: "Dark Coffee", strength: "Strong" },
-                  })
-                }
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={require("../../assets/images/DarkCoffeeIcon.png")}
-                  style={styles.recommendImage}
-                  contentFit="contain"
-                />
-                <View style={styles.recommendTextContainer}>
-                  <Text
-                    style={[
-                      styles.recommendTitle,
-                      { color: colors.cardHeader },
-                    ]}
-                  >
-                    Dark Coffee
-                  </Text>
-                  <Text
-                    style={[
-                      styles.recommendSubtitle,
-                      { color: colors.cardSubtext },
-                    ]}
-                  >
-                    Strong
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.recommendCard, { backgroundColor: colors.card }]}
-                onPress={() =>
-                  router.push({
-                    pathname: "/coffee-details",
-                    params: { name: "Light Coffee", strength: "Light" },
-                  })
-                }
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={require("../../assets/images/LightCoffeeIcon.png")}
-                  style={styles.recommendImage}
-                  contentFit="contain"
-                />
-                <View style={styles.recommendTextContainer}>
-                  <Text
-                    style={[
-                      styles.recommendTitle,
-                      { color: colors.cardHeader },
-                    ]}
-                  >
-                    Light Coffee
-                  </Text>
-                  <Text
-                    style={[
-                      styles.recommendSubtitle,
-                      { color: colors.cardSubtext },
-                    ]}
-                  >
-                    Light
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-
-          <View style={styles.sectionContainer}>
             <View style={styles.recipeHeader}>
               <Text
                 style={[
@@ -655,27 +527,28 @@ export default function HomeScreen() {
                   { color: colors.widgetBackground },
                 ]}
               >
-                Your Recipes
+                Your Smart Coffee
               </Text>
-              <TouchableOpacity
-                style={styles.plusButton}
-                onPress={() => router.push("/create-recipe")}
-              >
-                <Plus size={16} color="#000" />
-              </TouchableOpacity>
+              {/* Removed the tiny + button from here */}
             </View>
 
             <View style={styles.recipeList}>
               {savedRecipes.length === 0 ? (
-                <Text
-                  style={{
-                    color: colors.subtext,
-                    fontStyle: "italic",
-                    paddingVertical: 10,
-                  }}
+                // --- THE NEW MASSIVE BUTTON ---
+                <TouchableOpacity
+                  style={[
+                    styles.primaryBtn,
+                    { backgroundColor: colors.primaryButton, marginTop: 10 },
+                  ]}
+                  onPress={() => router.push("/create-recipe")}
+                  activeOpacity={0.8}
                 >
-                  You haven't saved any recipes yet. Tap the + to create one!
-                </Text>
+                  <Text
+                    style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}
+                  >
+                    Set Up My Smart Coffee
+                  </Text>
+                </TouchableOpacity>
               ) : (
                 savedRecipes.map((recipe) => (
                   <Swipeable
@@ -695,7 +568,7 @@ export default function HomeScreen() {
                           pathname: "/coffee-details",
                           params: {
                             name: recipe.name,
-                            strength: recipe.isDefault ? "Standard" : "Custom",
+                            strength: "Custom",
                             isCustom: "true",
                             recipeId: recipe.profileId,
                           },
@@ -893,24 +766,6 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 10, fontWeight: "600", marginTop: 4, color: "#fff" },
   sectionContainer: { gap: 12 },
   sectionTitle: { fontSize: 20, fontWeight: "600" },
-  horizontalScroll: { gap: 12 },
-  recommendCard: {
-    borderRadius: 15,
-    padding: 12,
-    width: 140,
-    height: 170,
-    justifyContent: "space-between",
-    overflow: "hidden",
-  },
-  recommendImage: {
-    width: "100%",
-    height: 100,
-    borderRadius: 15,
-    backgroundColor: "#d19a6a",
-  },
-  recommendTextContainer: { gap: 4 },
-  recommendTitle: { fontSize: 14, fontWeight: "600" },
-  recommendSubtitle: { fontSize: 12 },
   recipeHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
   plusButton: {
     backgroundColor: "grey",
@@ -938,6 +793,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: 80,
     borderRadius: 15,
+  },
+  primaryBtn: {
+    width: "100%",
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   bottomDecoration: {
     alignItems: "flex-end",

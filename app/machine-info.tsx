@@ -21,7 +21,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
-import { getMachineStatus } from "../src/backend/api/machine";
+import {
+  getMachineStatus,
+  sendMachineCommand,
+} from "../src/backend/api/machine";
 
 export default function MachineInfoScreen() {
   const router = useRouter();
@@ -77,7 +80,13 @@ export default function MachineInfoScreen() {
       loadStats();
     }, []),
   );
-
+  const handleRefill = async () => {
+    await sendMachineCommand("REFILL");
+    Alert.alert("Refilled!", "The machine levels have been reset to 100%.");
+    // Force a quick UI refresh
+    const data = await getMachineStatus();
+    setMachineData(data);
+  };
   const handleUnpair = () => {
     Alert.alert(
       "Unpair Machine",
@@ -207,12 +216,23 @@ export default function MachineInfoScreen() {
             <View style={styles.statRow}>
               <Text style={styles.statLabel}>Preference</Text>
               <Text style={styles.statValue}>
-                {isNaN(Number(coffeePref)) ? coffeePref : `Lvl ${coffeePref}`}
+                {/* Now properly displays: Level 12 */}
+                {isNaN(Number(coffeePref)) ? coffeePref : `Level ${coffeePref}`}
               </Text>
             </View>
           </View>
         </View>
-
+        <TouchableOpacity
+          style={[
+            styles.unpairButton,
+            { backgroundColor: colors.primaryButton, marginBottom: 15 },
+          ]}
+          onPress={handleRefill}
+          activeOpacity={0.8}
+        >
+          <Droplet color="#fff" size={20} />
+          <Text style={styles.unpairText}>Refill Machine</Text>
+        </TouchableOpacity>
         {/* --- Unpair Button --- */}
         <TouchableOpacity
           style={styles.unpairButton}

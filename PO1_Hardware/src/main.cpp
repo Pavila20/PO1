@@ -85,6 +85,14 @@ void handleCommand() {
   String command = doc["command"];
   Serial.println("App sent command: " + command);
 
+ if (command == "REFILL") {
+    waterLevel = 100;
+    beanLevel = 100;
+    waterLevelWarning = false;
+    Serial.println("App commanded a machine refill! Levels reset to 100%.");
+    server.send(200, "application/json", "{\"success\":true}");
+    return;
+  }
   if (command == "START_GRIND" && currentState == IDLE) {
     currentState = GRIND;
     actionStartTime = millis();

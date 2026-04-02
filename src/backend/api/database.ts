@@ -1,15 +1,15 @@
 // backendtest/PO1/src/api/database.ts
-import "react-native-get-random-values";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers";
 import {
+  DeleteCommand,
   DynamoDBDocumentClient,
   PutCommand,
   QueryCommand,
-  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers";
-import { PourProfile, BrewRating } from "../../models/types";
+import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
+import { BrewRating, PourProfile } from "../../models/types";
 import { getSessionToken } from "../auth/session"; // We need the user's JWT token
 
 // ⚠️ IMPORTANT: Replace these with your actual AWS details!
@@ -47,13 +47,14 @@ const RATINGS_TABLE = "PO1_BrewRatings";
 // --- POUR PROFILE FUNCTIONS ---
 
 export const savePourProfile = async (
-  profile: Omit<PourProfile, "profileId" | "createdAt">,
+  profile: any, // Changed to 'any' to easily accept our custom IDs
 ) => {
   const docClient = await getDynamoClient();
   const newProfile: PourProfile = {
     ...profile,
-    profileId: uuidv4(),
-    createdAt: new Date().toISOString(),
+    // THE FIX: Use the ID we passed, or generate a new one if it's missing!
+    profileId: profile.profileId ? profile.profileId : uuidv4(),
+    createdAt: profile.createdAt ? profile.createdAt : new Date().toISOString(),
   };
 
   const command = new PutCommand({

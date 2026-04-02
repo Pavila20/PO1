@@ -34,7 +34,7 @@ type BrewStep =
 export default function ActiveBrewScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { name } = useLocalSearchParams();
+  const { name, strength, isCustom, recipeId } = useLocalSearchParams();
 
   const isDark = theme === "dark";
 
@@ -107,13 +107,13 @@ export default function ActiveBrewScreen() {
   const handleStartGrinding = async () => {
     const machine = await getMachineStatus();
     if (machine) {
-      if (machine.beanWeight < 15) {
+      // FIX: Check beanLevel percentage (Simulation takes 5% per brew)
+      if (machine.beanLevel < 5) {
         setCurrentStep("ERROR_BEANS");
-      } else if (machine.grinderCupDetected) {
+      } else {
+        // We bypass the cup detection for the simulation demo
         await sendMachineCommand("START_GRIND");
         setCurrentStep("GRINDING");
-      } else {
-        setCurrentStep("ERROR_GRINDER");
       }
     }
   };
@@ -121,13 +121,13 @@ export default function ActiveBrewScreen() {
   const handleStartDispensing = async () => {
     const machine = await getMachineStatus();
     if (machine) {
-      if (machine.waterWeight < 250) {
+      // FIX: Check waterLevel percentage (Simulation takes 15% per brew)
+      if (machine.waterLevel < 15) {
         setCurrentStep("ERROR_WATER");
-      } else if (machine.dispenserCupDetected) {
+      } else {
+        // We bypass the cup detection for the simulation demo
         await sendMachineCommand("START_DISPENSE");
         setCurrentStep("DISPENSING");
-      } else {
-        setCurrentStep("ERROR_DISPENSER");
       }
     }
   };
@@ -135,9 +135,16 @@ export default function ActiveBrewScreen() {
   const handleFinish = () => {
     router.replace("/(tabs)/home");
   };
-
   const handleQA = () => {
-    router.push("/qa-rating");
+    router.push({
+      pathname: "/qa-rating",
+      // --- UPDATE: Pass it forward again! ---
+      params: {
+        name: name as string,
+        isCustom: isCustom as string,
+        recipeId: recipeId as string,
+      },
+    });
   };
 
   // --- RENDER HELPERS ---
