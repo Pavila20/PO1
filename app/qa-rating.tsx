@@ -14,7 +14,11 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
-import { saveBrewRating, savePourProfile } from "../src/backend/api/database";
+import {
+  getUserProfiles,
+  saveBrewRating,
+  savePourProfile,
+} from "../src/backend/api/database";
 import { getSessionUser } from "../src/backend/auth/session";
 import { calculateNewProfile } from "../src/backend/core/algorithm";
 import { PourProfile } from "../src/models/types";
@@ -25,7 +29,7 @@ export default function QARatingScreen() {
   const isDark = theme === "dark";
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [score, setScore] = useState(12);
+  const [score, setScore] = useState(12); // Enjoyment rating (1-15)
   const [strength, setStrength] = useState("Perfect");
   const [savedUserId, setSavedUserId] = useState<string>("unknown-user");
 
@@ -37,14 +41,17 @@ export default function QARatingScreen() {
   const trackBgColor = isDark ? "#333333" : "#E5E5E5";
 
   const handleContinue = async () => {
-    await AsyncStorage.setItem("user_coffee_pref", score.toString());
-
     try {
       const user = await getSessionUser();
       const realUserId = user?.sub || "unknown-user";
       setSavedUserId(realUserId);
 
-      const currentProfileUsed: PourProfile = {
+      // --- FIX: FETCH ACTUAL CURRENT PROFILE FROM DB INSTEAD OF HARDCODED VALUES ---
+      // This ensures the AI continues learning from the most recent brew parameters
+      const profiles = await getUserProfiles(realUserId);
+      const currentProfileUsed = profiles.find(
+        (p) => p.profileId === `ai-optimized-${realUserId}`,
+      ) || {
         profileId: `ai-optimized-${realUserId}`,
         userId: realUserId,
         name: "My Perfect Cup",
@@ -55,7 +62,6 @@ export default function QARatingScreen() {
         bloomTime: 30,
         dispenseRate: 3.5,
         isDefault: false,
-        createdAt: new Date().toISOString(),
       };
 
       const strengthMapped =
@@ -65,19 +71,22 @@ export default function QARatingScreen() {
             ? "Too strong"
             : "Just right";
 
+      // --- RECORD PARAMETERS IN HISTORY LOG ---
+      // Save the exact parameters used for this cup alongside the rating
       await saveBrewRating({
-        userId: currentProfileUsed.userId,
+        userId: realUserId,
         profileId: currentProfileUsed.profileId,
         rating: score,
         perceivedStrength: strengthMapped,
         targetTemp: currentProfileUsed.targetTemp,
         grindSize: currentProfileUsed.grindSize,
-        coffeeWeight: currentProfileUsed.coffeeWeight || 20,
+        coffeeWeight: currentProfileUsed.coffeeWeight,
         waterVolume: currentProfileUsed.waterVolume,
       });
 
+      // --- AI LEARNING LOGIC ---
       const optimizedRecipe = calculateNewProfile(
-        currentProfileUsed,
+        currentProfileUsed as PourProfile,
         score,
         strengthMapped,
       );
@@ -85,8 +94,20 @@ export default function QARatingScreen() {
       optimizedRecipe.profileId = `ai-optimized-${realUserId}`;
       optimizedRecipe.name = "My Perfect Cup";
 
+      // --- FIX: UPDATE LOCAL PREFERENCE (BITTERNESS 1-20) ---
+      // Map the new temperature back to the 1-20 UI scale (191-210°F range)
+      const newBitternessLevel = Math.max(
+        1,
+        Math.min(20, optimizedRecipe.targetTemp - 190),
+      );
+      await AsyncStorage.setItem(
+        "user_coffee_pref",
+        newBitternessLevel.toString(),
+      );
+
+      // Save the newly optimized profile to AWS
       await savePourProfile(optimizedRecipe);
-      console.log("Smart Cup updated in AWS!");
+      console.log("AI-Optimized Cup saved in AWS!");
     } catch (error) {
       console.error("Failed to sync feedback with AWS:", error);
     }
@@ -182,47 +203,26 @@ export default function QARatingScreen() {
             </TouchableOpacity>
           </>
         ) : (
-          <>
-            <View style={styles.recommendationBlock}>
-              <Text style={[styles.recommendTitle, { color: textColor }]}>
-                Thanks for your feedback!
+          <View style={styles.recommendationBlock}>
+            <Text style={[styles.recommendTitle, { color: textColor }]}>
+              Thanks for your feedback!
+            </Text>
+            <Text style={[styles.recommendSub, { color: subtextColor }]}>
+              The machine learned from your rating and automatically adjusted
+              parameters for your next "My Perfect Cup" brew.
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                { backgroundColor: btnBgColor, marginTop: 20 },
+              ]}
+              onPress={() => router.replace("/(tabs)/home")}
+            >
+              <Text style={[styles.primaryBtnText, { color: btnTextColor }]}>
+                Go Back Home
               </Text>
-              <Text style={[styles.recommendSub, { color: subtextColor }]}>
-                Your machine has learned from this and automatically adjusted
-                "My Perfect Cup" for next time.
-              </Text>
-            </View>
-
-            <View style={styles.actionBlock}>
-              <TouchableOpacity
-                style={[styles.secondaryBtn, { borderColor: btnBgColor }]}
-                onPress={() =>
-                  router.replace({
-                    pathname: "/active-brew",
-                    params: {
-                      name: "My Perfect Cup",
-                      strength: "Custom",
-                      isCustom: "true",
-                      recipeId: `ai-optimized-${savedUserId}`,
-                    },
-                  })
-                }
-              >
-                <Text style={[styles.secondaryBtnText, { color: textColor }]}>
-                  Brew Updated Cup
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: btnBgColor }]}
-                onPress={() => router.replace("/(tabs)/home")}
-              >
-                <Text style={[styles.primaryBtnText, { color: btnTextColor }]}>
-                  Go Back Home
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </SafeAreaView>
@@ -290,7 +290,6 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     lineHeight: 24,
   },
-  actionBlock: { gap: 15 },
   primaryBtn: {
     width: "100%",
     paddingVertical: 16,
@@ -298,11 +297,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primaryBtnText: { fontSize: 18, fontWeight: "800" },
-  secondaryBtn: {
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: "center",
-    borderWidth: 2,
-  },
-  secondaryBtnText: { fontSize: 18, fontWeight: "800" },
 });

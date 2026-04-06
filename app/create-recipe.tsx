@@ -38,31 +38,33 @@ export default function CreateRecipeScreen() {
       const user = await getSessionUser();
       const realUserId = user?.sub || "unknown-user";
 
-      // Convert the 1-15 baseline into temp and grind
+      // 1. Temperature Mapping: 191°F to 205°F
       const calculatedTemp = Math.round(190 + sliderValue);
+
+      // 2. Grind Size Mapping: 29 (Coarse) to 15 (Fine)
       const calculatedGrind = Math.round(30 - sliderValue);
 
-      // Save the baseline to AWS using the AI ID!
+      // 3. NEW Bean Weight Mapping: 12g to 28g (Linear mapping for 1-15 scale)
+      // Formula: 12 + (sliderValue - 1) * (total_range / steps)
+      const calculatedWeight = Math.round(12 + (sliderValue - 1) * (16 / 14));
+
+      // Save the profile with all parameters required by the Midterm Report
       await savePourProfile({
         userId: realUserId,
         name: "My Perfect Cup",
         targetTemp: calculatedTemp,
         grindSize: calculatedGrind,
-        waterVolume: 250,
-
-        // --- ADD THESE 3 NEW PARAMETERS HERE ---
-        coffeeWeight: 20,
-        bloomTime: 30,
-        dispenseRate: 3.5,
-        // ---------------------------------------
-
+        coffeeWeight: calculatedWeight, // Dynamic based on slider
+        waterVolume: 250, // Standard cup volume
+        bloomTime: 30, // Required 30s bloom phase
+        dispenseRate: 3.5, // Target 3.5 mL/sec flow rate
         isDefault: false,
         profileId: `ai-optimized-${realUserId}`,
       });
 
       await AsyncStorage.setItem("user_coffee_pref", sliderValue.toString());
 
-      // --- THE FIX: GO STRAIGHT TO BREWING ---
+      // Navigate to brewing with the new custom profile
       router.replace({
         pathname: "/active-brew",
         params: {
@@ -102,7 +104,7 @@ export default function CreateRecipeScreen() {
         </View>
 
         <Text style={[styles.label, { color: textColor }]}>
-          How would you like your coffee
+          Set your baseline strength preference:
         </Text>
 
         <Text style={[styles.sliderValueText, { color: btnBgColor }]}>

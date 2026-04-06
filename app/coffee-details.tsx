@@ -424,7 +424,7 @@ export default function CoffeeDetailsScreen() {
             </Text>
             {/* Show the actual 1-15 number here! */}
             <Text style={[styles.bitternessTitle, { color: textColor }]}>
-              Bitterness Level: {prefNumber}/15
+              Bitterness Level: {prefNumber}/20
             </Text>
           </View>
 
