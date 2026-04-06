@@ -51,6 +51,9 @@ export default function QARatingScreen() {
         targetTemp: 200,
         grindSize: 15,
         waterVolume: 250,
+        coffeeWeight: 20,
+        bloomTime: 30,
+        dispenseRate: 3.5,
         isDefault: false,
         createdAt: new Date().toISOString(),
       };
@@ -67,6 +70,10 @@ export default function QARatingScreen() {
         profileId: currentProfileUsed.profileId,
         rating: score,
         perceivedStrength: strengthMapped,
+        targetTemp: currentProfileUsed.targetTemp,
+        grindSize: currentProfileUsed.grindSize,
+        coffeeWeight: currentProfileUsed.coffeeWeight || 20,
+        waterVolume: currentProfileUsed.waterVolume,
       });
 
       const optimizedRecipe = calculateNewProfile(

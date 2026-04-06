@@ -1,157 +1,195 @@
-#include <Arduino.h>  // <-- THIS IS REQUIRED IN PLATFORMIO
+#include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
 
-// ⚠️ UPDATE THESE WITH YOUR ACTUAL WI-FI CREDENTIALS
-const char* ssid = "Reveille Ranch Resident";
-const char* password = "YN85V2DRFQ4KJ9ZT";
+// =========================================================
+// WIFI CONFIGURATION (TAMU_IoT MAC Authenticated)
+// =========================================================
+//const char* WIFI_SSID     = "TAMU_IoT";        
+//const char* WIFI_PASSWORD = "";    // Leave empty! 
+const char* WIFI_SSID     = "Reveille Ranch Resident";        
+const char* WIFI_PASSWORD = "YN85V2DRFQ4KJ9ZT";    // Leave empty! 
+const int SERVER_PORT     = 80;   
 
-WebServer server(80);
+WebServer server(SERVER_PORT);
 
-// --- 1. THE STATE MACHINE ---
-enum SystemState { IDLE, GRIND, USER_PROMPT, PUMP, HEAT, DISPENSE, ERROR_STATE };
-SystemState currentState = IDLE;
+// =========================================================
+// MACHINE STATE & HARDWARE SIMULATION VARIABLES
+// =========================================================
+enum MachineState { IDLE, GRIND, HEAT, DISPENSE, USER_PROMPT, ERROR };
+MachineState currentState = IDLE;
 
-// --- 2. HARDWARE VARIABLES (Simulated for now) ---
-int beanWeight = 20;
-int waterWeight = 300;
 int waterLevel = 100;
 int beanLevel = 100;
-int boilerTemp = 90;
-bool grinderCupDetected = true;
-bool dispenserCupDetected = true;
+int boilerTemp = 200;
 bool waterLevelWarning = false;
 
 unsigned long actionStartTime = 0;
 
-// --- FUNCTION PROTOTYPES (Required for C++ / PlatformIO) ---
-void handleOptions();
-void handleStatus();
-void handleCommand();
-
-// Handle CORS preflight requests
-void handleOptions() {
+// =========================================================
+// CORS HEADERS
+// =========================================================
+void sendCORSHeaders() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.sendHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, Bypass-Tunnel-Reminder, User-Agent");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+void handleOptions() {
+  sendCORSHeaders();
   server.send(204);
 }
 
-// --- 3. ENDPOINT: GET /status ---
+// =========================================================
+// REST API ENDPOINTS
+// =========================================================
+
 void handleStatus() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
+  StaticJsonDocument<250> doc;
   
-  StaticJsonDocument<512> doc;
+  String stateStr = "IDLE";
+  if (currentState == GRIND) stateStr = "GRIND";
+  else if (currentState == USER_PROMPT) stateStr = "USER_PROMPT";
+  else if (currentState == DISPENSE) stateStr = "DISPENSE";
+  else if (currentState == ERROR) stateStr = "ERROR";
 
-  String statusStr = "IDLE";
-  if(currentState == GRIND) statusStr = "GRIND";
-  else if(currentState == USER_PROMPT) statusStr = "USER_PROMPT";
-  else if(currentState == DISPENSE) statusStr = "DISPENSE";
-  else if(currentState == ERROR_STATE) statusStr = "ERROR";
-
-  doc["status"] = statusStr;
-  doc["waterLevel"] = waterLevel;
-  doc["beanLevel"] = beanLevel;
+  doc["status"] = stateStr;
   doc["boilerTemp"] = boilerTemp;
+  doc["beanLevel"] = beanLevel;
+  doc["waterLevel"] = waterLevel;
   doc["waterLevelWarning"] = waterLevelWarning;
-  doc["beanWeight"] = beanWeight;
-  doc["waterWeight"] = waterWeight;
-  doc["grinderCupDetected"] = grinderCupDetected;
-  doc["dispenserCupDetected"] = dispenserCupDetected;
 
   String response;
   serializeJson(doc, response);
+  
+  sendCORSHeaders();
   server.send(200, "application/json", response);
 }
 
-// --- 4. ENDPOINT: POST /command ---
 void handleCommand() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
+  sendCORSHeaders();
   
   if (server.hasArg("plain") == false) {
-    server.send(400, "application/json", "{\"success\": false}");
+    server.send(400, "text/plain", "Body not received");
     return;
   }
 
-  StaticJsonDocument<256> doc;
-  DeserializationError error = deserializeJson(doc, server.arg("plain"));
-
-  if (error) {
-    server.send(400, "application/json", "{\"success\": false}");
-    return;
-  }
-
+  String body = server.arg("plain");
+  StaticJsonDocument<200> doc;
+  deserializeJson(doc, body);
+  
   String command = doc["command"];
-  Serial.println("App sent command: " + command);
 
- if (command == "REFILL") {
+  // --- NORMAL APP COMMANDS ---
+  if (command == "START_GRIND") {
+    currentState = GRIND;
+    actionStartTime = millis();
+    Serial.println("App commanded: START GRIND");
+    server.send(200, "application/json", "{\"success\":true}");
+  } 
+  else if (command == "START_DISPENSE") {
+    currentState = DISPENSE;
+    actionStartTime = millis();
+    Serial.println("App commanded: START DISPENSE");
+    server.send(200, "application/json", "{\"success\":true}");
+  } 
+  
+  // --- TESTING / SIMULATION COMMANDS ---
+  else if (command == "REFILL") {
     waterLevel = 100;
     beanLevel = 100;
     waterLevelWarning = false;
-    Serial.println("App commanded a machine refill! Levels reset to 100%.");
+    currentState = IDLE;
+    Serial.println("TEST: Refilled machine!");
     server.send(200, "application/json", "{\"success\":true}");
-    return;
   }
-  if (command == "START_GRIND" && currentState == IDLE) {
-    currentState = GRIND;
-    actionStartTime = millis();
-    Serial.println("Turning on Grinder Motor...");
-  } 
-  else if (command == "START_DISPENSE" && currentState == USER_PROMPT) {
-    currentState = DISPENSE;
-    actionStartTime = millis();
-    Serial.println("Opening Water Valve...");
+  else if (command == "EMPTY_WATER") {
+    waterLevel = 4; // Below the 15% threshold to trigger the error in the app
+    waterLevelWarning = true;
+    Serial.println("TEST: Emptied water tank!");
+    server.send(200, "application/json", "{\"success\":true}");
   }
-
-  server.send(200, "application/json", "{\"success\": true}");
+  else if (command == "EMPTY_BEANS") {
+    beanLevel = 2; // Below the 5% threshold
+    Serial.println("TEST: Emptied bean hopper!");
+    server.send(200, "application/json", "{\"success\":true}");
+  }
+  else if (command == "TRIGGER_ERROR") {
+    currentState = ERROR;
+    Serial.println("TEST: Machine error state triggered!");
+    server.send(200, "application/json", "{\"success\":true}");
+  }
+  else if (command == "CLEAR_ERROR") {
+    currentState = IDLE;
+    Serial.println("TEST: Cleared error state!");
+    server.send(200, "application/json", "{\"success\":true}");
+  }
+  
+  else {
+    server.send(400, "application/json", "{\"success\":false, \"message\":\"Unknown command\"}");
+  }
 }
+
+// =========================================================
+// SETUP & MAIN LOOP
+// =========================================================
 
 void setup() {
   Serial.begin(115200);
   
-  Serial.print("Connecting to Wi-Fi");
-  WiFi.begin(ssid, password);
+  // ADD THIS LINE: Wait 3 seconds for Windows/Mac to open the USB Serial Monitor!
+  delay(3000); 
+  
+  Serial.println("\n=== MACHINE AWAKE & STARTING ===");
+
+  WiFi.mode(WIFI_STA);
+
+  Serial.println("\nConnecting to TAMU_IoT...");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  int attempts = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+    attempts++;
+    if (attempts > 30) {
+      Serial.println("\nNetwork rejecting connection. (If you just registered, wait 15 mins for TAMU routers to update!)");
+      attempts = 0; 
+    }
   }
-  
-  Serial.println("\n--- PO1 MACHINE ONLINE ---");
-  Serial.print("IP Address for your .env file: ");
-  Serial.println(WiFi.localIP()); 
+
+  Serial.println("\n Connected to WiFi!");
+  Serial.print(" Machine IP Address: ");
+  Serial.println(WiFi.localIP());
 
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/command", HTTP_POST, handleCommand);
-  server.onNotFound(handleOptions); 
-
+  server.on("/command", HTTP_OPTIONS, handleOptions);
+  
   server.begin();
+  Serial.println("HTTP server started");
 }
 
 void loop() {
   server.handleClient();
 
-  // Hardware state logic (Simulated)
+  // --- HARDWARE SIMULATION LOGIC ---
   if (currentState == GRIND) {
     if (millis() - actionStartTime > 5000) { 
-      currentState = USER_PROMPT;
-      Serial.println("Grinding finished. Waiting for user to move cup.");
-      
-      // --- SIMULATE BEAN DROP ---
-      beanLevel = beanLevel - 5; 
-      if (beanLevel < 0) beanLevel = 0; // Don't let it go below 0%
-      Serial.println("Bean level dropped to: " + String(beanLevel) + "%");
+      currentState = USER_PROMPT; 
+      beanLevel -= 5;             
+      if (beanLevel < 0) beanLevel = 0;
+      Serial.println("Finished Grinding. Waiting for user to move cup.");
     }
-  } 
+  }
   else if (currentState == DISPENSE) {
     if (millis() - actionStartTime > 7000) { 
-      currentState = IDLE;
-      Serial.println("Dispensing complete. Machine ready.");
-
-      // --- SIMULATE WATER DROP ---
-      waterLevel = waterLevel - 15;
-      if (waterLevel < 0) waterLevel = 0; // Don't let it go below 0%
-      Serial.println("Water level dropped to: " + String(waterLevel) + "%");
+      currentState = IDLE;       
+      waterLevel -= 15;          
+      if (waterLevel < 0) waterLevel = 0;
+      if (waterLevel < 15) waterLevelWarning = true;
+      Serial.println("Finished Dispensing. Coffee ready!");
     }
   }
 }

@@ -6,6 +6,7 @@ import {
   DynamoDBDocumentClient,
   PutCommand,
   QueryCommand,
+  ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
@@ -111,4 +112,27 @@ export const saveBrewRating = async (
 
   await docClient.send(command);
   return newRating;
+};
+export const getUserRecentBrews = async (userId: string) => {
+  const docClient = await getDynamoClient();
+
+  // We use ScanCommand so we don't need a custom index in AWS
+  const command = new ScanCommand({
+    TableName: RATINGS_TABLE,
+    FilterExpression: "userId = :userId",
+    ExpressionAttributeValues: {
+      ":userId": userId,
+    },
+  });
+
+  const response = await docClient.send(command);
+  const items = (response.Items || []) as BrewRating[];
+
+  // Sort by timestamp descending (newest first) and grab the top 5
+  return items
+    .sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    )
+    .slice(0, 5);
 };

@@ -49,6 +49,13 @@ export default function CreateRecipeScreen() {
         targetTemp: calculatedTemp,
         grindSize: calculatedGrind,
         waterVolume: 250,
+
+        // --- ADD THESE 3 NEW PARAMETERS HERE ---
+        coffeeWeight: 20,
+        bloomTime: 30,
+        dispenseRate: 3.5,
+        // ---------------------------------------
+
         isDefault: false,
         profileId: `ai-optimized-${realUserId}`,
       });
@@ -95,7 +102,7 @@ export default function CreateRecipeScreen() {
         </View>
 
         <Text style={[styles.label, { color: textColor }]}>
-          Set your baseline strength preference:
+          How would you like your coffee
         </Text>
 
         <Text style={[styles.sliderValueText, { color: btnBgColor }]}>
@@ -105,7 +112,7 @@ export default function CreateRecipeScreen() {
         <Slider
           style={{ width: "100%", height: 40 }}
           minimumValue={1}
-          maximumValue={15}
+          maximumValue={20}
           step={1}
           value={sliderValue}
           onValueChange={setSliderValue}

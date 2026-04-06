@@ -40,6 +40,7 @@ import { getSessionUser, signOutLocal } from "../../src/backend/auth/session";
 import {
   deletePourProfile,
   getUserProfiles,
+  getUserRecentBrews,
 } from "../../src/backend/api/database";
 
 const PROFILE_OPTIONS = [
@@ -67,6 +68,7 @@ export default function HomeScreen() {
 
   const [coffeePref, setCoffeePref] = useState("8");
   const [savedRecipes, setSavedRecipes] = useState<any[]>([]);
+  const [recentHistory, setRecentHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const currentHour = new Date().getHours();
@@ -120,10 +122,14 @@ export default function HomeScreen() {
           if (user) {
             const cloudRecipes = await getUserProfiles(user.sub);
             setSavedRecipes(cloudRecipes);
+
+            const history = await getUserRecentBrews(user.sub);
+            setRecentHistory(history);
           }
         } catch (error) {
-          console.error("Failed to load cloud recipes:", error);
+          console.error("Failed to load cloud recipes/history:", error);
           setSavedRecipes([]);
+          setRecentHistory([]);
         }
       };
       loadDynamicData();
@@ -529,24 +535,36 @@ export default function HomeScreen() {
               >
                 Your Smart Coffee
               </Text>
-              {/* Removed the tiny + button from here */}
             </View>
 
             <View style={styles.recipeList}>
               {savedRecipes.length === 0 ? (
-                // --- THE NEW MASSIVE BUTTON ---
                 <TouchableOpacity
                   style={[
                     styles.primaryBtn,
-                    { backgroundColor: colors.primaryButton, marginTop: 10 },
+                    {
+                      backgroundColor: colors.card,
+                      marginTop: 10,
+                      flexDirection: "column",
+                      paddingVertical: 32,
+                    },
                   ]}
                   onPress={() => router.push("/create-recipe")}
                   activeOpacity={0.8}
                 >
+                  <Image
+                    source={require("../../assets/images/MorningCoffeeIcon.png")}
+                    style={{ width: 64, height: 64, marginBottom: 12 }}
+                    contentFit="contain"
+                  />
                   <Text
-                    style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}
+                    style={{
+                      color: colors.text,
+                      fontSize: 16,
+                      fontWeight: "bold",
+                    }}
                   >
-                    Set Up My Smart Coffee
+                    Get started in home
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -597,7 +615,8 @@ export default function HomeScreen() {
                             ]}
                           >
                             Temp: {recipe.targetTemp}°C • Grind:{" "}
-                            {recipe.grindSize}
+                            {recipe.grindSize} • Beans:{" "}
+                            {recipe.coffeeWeight || 20}g
                           </Text>
                         </View>
                         <ChevronRight size={20} color={colors.cardHeader} />
@@ -605,6 +624,113 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   </Swipeable>
                 ))
+              )}
+            </View>
+          </View>
+
+          {/* --- RECENT HISTORY SECTION --- */}
+          <View style={[styles.sectionContainer, { marginTop: 16 }]}>
+            <View style={styles.recipeHeader}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: colors.widgetBackground },
+                ]}
+              >
+                Recent Brew History
+              </Text>
+            </View>
+
+            <View style={styles.historyList}>
+              {recentHistory.length === 0 ? (
+                <Text
+                  style={{
+                    color: colors.subtext,
+                    marginTop: 8,
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  No recent brews yet.
+                </Text>
+              ) : (
+                recentHistory.map((brew, index) => {
+                  const profile = savedRecipes.find(
+                    (r) => r.profileId === brew.profileId,
+                  );
+                  const brewName = profile ? profile.name : "Custom Brew";
+
+                  // Simplified params for a cleaner look
+                  const paramsText = profile
+                    ? `${profile.targetTemp}°C • ${profile.coffeeWeight || 20}g • ${profile.waterVolume}ml`
+                    : "Custom Parameters";
+
+                  // Formatted date to look cleaner (e.g., "Oct 24")
+                  const dateStr = new Date(brew.timestamp).toLocaleDateString(
+                    undefined,
+                    { month: "short", day: "numeric" },
+                  );
+                  const timeStr = new Date(brew.timestamp).toLocaleTimeString(
+                    [],
+                    { hour: "2-digit", minute: "2-digit" },
+                  );
+
+                  return (
+                    <View
+                      key={brew.ratingId || index}
+                      style={[
+                        styles.historyItem,
+                        { borderBottomColor: isDark ? "#333" : "#E5E5E5" },
+                      ]}
+                    >
+                      {/* Minimal timeline dot instead of a big image */}
+                      <View
+                        style={[
+                          styles.historyDot,
+                          { backgroundColor: colors.primaryButton },
+                        ]}
+                      />
+
+                      <View style={styles.historyContent}>
+                        <View style={styles.historyRowTitle}>
+                          <Text
+                            style={[
+                              styles.historyTitle,
+                              { color: colors.text },
+                            ]}
+                          >
+                            {brewName}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.historyRating,
+                              { color: colors.text },
+                            ]}
+                          >
+                            {brew.rating}/15
+                          </Text>
+                        </View>
+
+                        <Text
+                          style={[
+                            styles.historyParams,
+                            { color: colors.subtext },
+                          ]}
+                        >
+                          {paramsText} • {brew.perceivedStrength}
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.historyTime,
+                            { color: colors.subtext },
+                          ]}
+                        >
+                          {dateStr} at {timeStr}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
               )}
             </View>
           </View>
@@ -655,6 +781,47 @@ const styles = StyleSheet.create({
   themeRow: {
     paddingVertical: 10,
   },
+  historyList: {
+    gap: 0, // Removes gap because we are using borders now
+  },
+  historyItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  historyDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 6, // Aligns perfectly with the first line of text
+  },
+  historyContent: {
+    flex: 1,
+    gap: 4,
+  },
+  historyRowTitle: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  historyTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  historyRating: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  historyParams: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  historyTime: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
   menuText: { fontSize: 16, fontWeight: "500" },
   menuDivider: { height: 1, width: "100%" },
   picModalOverlay: {
@@ -696,7 +863,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   picOptionImage: { width: "100%", height: "100%" },
-  scrollContent: { paddingHorizontal: 21, paddingBottom: 100, gap: 24 },
+  scrollContent: { paddingHorizontal: 21, paddingBottom: 150, gap: 24 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -803,9 +970,11 @@ const styles = StyleSheet.create({
   },
   bottomDecoration: {
     alignItems: "flex-end",
-    marginTop: -250,
-    marginRight: 2,
-    zIndex: 10,
+    position: "absolute",
+    bottom: -50,
+    right: 2,
+    zIndex: -1,
+    opacity: 0.5,
   },
   decorationImage: { width: 90, height: 250 },
 });
