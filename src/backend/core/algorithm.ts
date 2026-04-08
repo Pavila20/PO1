@@ -34,9 +34,12 @@ export const calculateNewProfile = (
 
   // 2. Learning Rate Calculation (Severity)
   const severity = (15 - rating) / 15;
-  const tempDelta = Math.round(6 * severity);
-  const grindDelta = Math.round(5 * severity);
-  const weightDelta = Math.round(3 * severity);
+
+  // Math.max(1, ...) ensures that if you select "Too weak/strong",
+  // it always adjusts by AT LEAST 1 unit, but caps the maximum jump to a realistic amount.
+  const tempDelta = Math.max(1, Math.round(3 * severity)); // Max jump of 3° (was 6°)
+  const grindDelta = Math.max(1, Math.round(2 * severity)); // Max jump of 2 grind sizes (was 5)
+  const weightDelta = Math.max(1, Math.round(1.5 * severity)); // Max jump of 1-2g (was 3g)
 
   // 3. Apply Extraction Logic
   if (perceivedStrength === "Too weak") {

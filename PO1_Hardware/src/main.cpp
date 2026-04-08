@@ -9,7 +9,7 @@
 //const char* WIFI_SSID     = "TAMU_IoT";        
 //const char* WIFI_PASSWORD = "";    // Leave empty! 
 const char* WIFI_SSID     = "Reveille Ranch Resident";        
-const char* WIFI_PASSWORD = "YN85V2DRFQ4KJ9ZT";    // Leave empty! 
+const char* WIFI_PASSWORD = "YN85V2DRFQ4KJ9ZT"; 
 const int SERVER_PORT     = 80;   
 
 WebServer server(SERVER_PORT);

@@ -48,30 +48,30 @@ export default function CreateRecipeScreen() {
       // Formula: 12 + (sliderValue - 1) * (total_range / steps)
       const calculatedWeight = Math.round(12 + (sliderValue - 1) * (16 / 14));
 
-      // Save the profile with all parameters required by the Midterm Report
-      await savePourProfile({
+      // Save the profile and capture the returned object (with the safe, unique ID!)
+      const savedProfile = await savePourProfile({
         userId: realUserId,
         name: "My Perfect Cup",
         targetTemp: calculatedTemp,
         grindSize: calculatedGrind,
-        coffeeWeight: calculatedWeight, // Dynamic based on slider
-        waterVolume: 250, // Standard cup volume
-        bloomTime: 30, // Required 30s bloom phase
-        dispenseRate: 3.5, // Target 3.5 mL/sec flow rate
+        coffeeWeight: calculatedWeight,
+        waterVolume: 250,
+        bloomTime: 30,
+        dispenseRate: 3.5,
         isDefault: false,
-        profileId: `ai-optimized-${realUserId}`,
+        profileId: `ai-optimized`, // Our backend logic will automatically prepend the userId to this
       });
 
       await AsyncStorage.setItem("user_coffee_pref", sliderValue.toString());
 
-      // Navigate to brewing with the new custom profile
+      // Navigate to the details screen first, NOT straight to brewing!
       router.replace({
-        pathname: "/active-brew",
+        pathname: "/coffee-details",
         params: {
           name: "My Perfect Cup",
           strength: "Custom",
           isCustom: "true",
-          recipeId: `ai-optimized-${realUserId}`,
+          recipeId: savedProfile.profileId, // We use the safe, guaranteed ID from DynamoDB
         },
       });
     } catch (error) {

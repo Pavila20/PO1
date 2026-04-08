@@ -1,17 +1,16 @@
-import * as SecureStore from "expo-secure-store";
 import {
   CognitoIdentityProviderClient,
-  SignUpCommand,
-  ConfirmSignUpCommand,
-  ResendConfirmationCodeCommand,
-  InitiateAuthCommand,
-  ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
+  ConfirmSignUpCommand,
+  ForgotPasswordCommand,
+  InitiateAuthCommand,
+  ResendConfirmationCodeCommand,
+  SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
+import * as SecureStore from "expo-secure-store";
 
 const REGION = process.env.EXPO_PUBLIC_AWS_REGION!;
 const USER_POOL_CLIENT_ID = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID!;
-
 
 const cip = new CognitoIdentityProviderClient({ region: REGION });
 
@@ -29,19 +28,28 @@ export function isStrongPassword(v: string) {
   return /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/.test(v);
 }
 
-export async function signUpEmailPassword(email: string, password: string, name?: string) {
+export async function signUpEmailPassword(
+  email: string,
+  password: string,
+  name?: string,
+) {
   email = email.trim().toLowerCase();
 
   if (!isValidEmail(email)) throw new Error("Enter a valid email.");
   if (!isStrongPassword(password)) {
-    throw new Error("Password must be 8+ chars and include upper/lower/number/special.");
+    throw new Error(
+      "Password must be 8+ chars and include upper/lower/number/special.",
+    );
   }
 
   const cmd = new SignUpCommand({
     ClientId: USER_POOL_CLIENT_ID,
     Username: email,
     Password: password,
-    UserAttributes: [{ Name: "email", Value: email }, ...(name ? [{ Name: "name", Value: name }] : [])],
+    UserAttributes: [
+      { Name: "email", Value: email },
+      ...(name ? [{ Name: "name", Value: name }] : []),
+    ],
   });
 
   return cip.send(cmd);
@@ -92,7 +100,8 @@ export async function signInEmailPassword(email: string, password: string) {
 
   await SecureStore.setItemAsync(KEY_ID, result.IdToken);
   await SecureStore.setItemAsync(KEY_ACCESS, result.AccessToken);
-  if (result.RefreshToken) await SecureStore.setItemAsync(KEY_REFRESH, result.RefreshToken);
+  if (result.RefreshToken)
+    await SecureStore.setItemAsync(KEY_REFRESH, result.RefreshToken);
 
   return result;
 }
@@ -108,7 +117,11 @@ export async function forgotPasswordRequest(email: string) {
   return cip.send(cmd);
 }
 
-export async function forgotPasswordConfirm(email: string, code: string, newPassword: string) {
+export async function forgotPasswordConfirm(
+  email: string,
+  code: string,
+  newPassword: string,
+) {
   email = email.trim().toLowerCase();
   code = code.trim();
 
@@ -120,4 +133,31 @@ export async function forgotPasswordConfirm(email: string, code: string, newPass
   });
 
   return cip.send(cmd);
+}
+export async function refreshSession() {
+  const refreshToken = await SecureStore.getItemAsync(KEY_REFRESH);
+  if (!refreshToken) {
+    throw new Error("No refresh token available.");
+  }
+
+  const cmd = new InitiateAuthCommand({
+    AuthFlow: "REFRESH_TOKEN_AUTH",
+    ClientId: USER_POOL_CLIENT_ID,
+    AuthParameters: {
+      REFRESH_TOKEN: refreshToken,
+    },
+  });
+
+  const out = await cip.send(cmd);
+  const result = out.AuthenticationResult;
+
+  if (result?.IdToken) await SecureStore.setItemAsync(KEY_ID, result.IdToken);
+  if (result?.AccessToken)
+    await SecureStore.setItemAsync(KEY_ACCESS, result.AccessToken);
+
+  // Cognito doesn't always return a new refresh token, but if it does, update it
+  if (result?.RefreshToken)
+    await SecureStore.setItemAsync(KEY_REFRESH, result.RefreshToken);
+
+  return result?.IdToken;
 }

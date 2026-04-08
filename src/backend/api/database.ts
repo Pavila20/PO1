@@ -11,7 +11,7 @@ import {
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { BrewRating, PourProfile } from "../../models/types";
-import { getSessionToken } from "../auth/session"; // We need the user's JWT token
+import { getSessionToken, getSessionUser } from "../auth/session"; // We need the user's JWT token
 
 // ⚠️ IMPORTANT: Replace these with your actual AWS details!
 const REGION = "us-east-2"; // Or your specific region
@@ -47,14 +47,25 @@ const RATINGS_TABLE = "PO1_BrewRatings";
 
 // --- POUR PROFILE FUNCTIONS ---
 
-export const savePourProfile = async (
-  profile: any, // Changed to 'any' to easily accept our custom IDs
-) => {
+export const savePourProfile = async (profile: any) => {
   const docClient = await getDynamoClient();
+
+  // 2. Fetch the user's session to grab their email
+  const sessionUser = await getSessionUser();
+  const email = sessionUser?.email || "Unknown Email";
+
+  let finalProfileId = profile.profileId ? profile.profileId : uuidv4();
+
+  // Keep our namespace fix from earlier
+  if (profile.userId && !finalProfileId.startsWith(profile.userId)) {
+    finalProfileId = `${profile.userId}_${finalProfileId}`;
+  }
+
+  // 3. Add the userEmail to the object we save to DynamoDB
   const newProfile: PourProfile = {
     ...profile,
-    // THE FIX: Use the ID we passed, or generate a new one if it's missing!
-    profileId: profile.profileId ? profile.profileId : uuidv4(),
+    profileId: finalProfileId,
+    userEmail: email, // <-- THIS SAVES THE EMAIL TO YOUR DB
     createdAt: profile.createdAt ? profile.createdAt : new Date().toISOString(),
   };
 
@@ -99,9 +110,15 @@ export const saveBrewRating = async (
   ratingData: Omit<BrewRating, "ratingId" | "timestamp">,
 ) => {
   const docClient = await getDynamoClient();
+
+  // 1. Fetch the user's session to grab their email
+  const sessionUser = await getSessionUser();
+  const email = sessionUser?.email || "Unknown Email";
+
   const newRating: BrewRating = {
     ...ratingData,
     ratingId: uuidv4(),
+    userEmail: email, // <-- THIS SAVES THE EMAIL TO YOUR DB
     timestamp: new Date().toISOString(),
   };
 

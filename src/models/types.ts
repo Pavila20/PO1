@@ -18,6 +18,7 @@ export interface PourProfile {
 export interface BrewRating {
   ratingId: string;
   userId: string;
+  userEmail?: string;
   profileId: string;
   rating: number;
   perceivedStrength: string;

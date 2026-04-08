@@ -501,7 +501,7 @@ export default function HomeScreen() {
                     <Thermometer size={14} color="#000" />
                   </View>
                   <Text style={styles.statLabel}>
-                    {machineData?.boilerTemp ?? "--"}°C
+                    {machineData?.boilerTemp ?? "--"}°F
                   </Text>
                 </View>
 
@@ -614,7 +614,7 @@ export default function HomeScreen() {
                               { color: colors.cardSubtext },
                             ]}
                           >
-                            Temp: {recipe.targetTemp}°C • Grind:{" "}
+                            Temp: {recipe.targetTemp}°F • Grind:{" "}
                             {recipe.grindSize} • Beans:{" "}
                             {recipe.coffeeWeight || 20}g
                           </Text>
@@ -661,7 +661,7 @@ export default function HomeScreen() {
 
                   // Simplified params for a cleaner look
                   const paramsText = profile
-                    ? `${profile.targetTemp}°C • ${profile.coffeeWeight || 20}g • ${profile.waterVolume}ml`
+                    ? `${profile.targetTemp}°F • ${profile.coffeeWeight || 20}g • ${profile.waterVolume}ml`
                     : "Custom Parameters";
 
                   // Formatted date to look cleaner (e.g., "Oct 24")
