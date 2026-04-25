@@ -179,7 +179,10 @@ export default function MachineInfoScreen() {
                 <Coffee size={20} color="#fff" />
               </View>
               <View style={styles.taskText}>
-                <Text style={styles.taskTitle}>Yes</Text>
+                {/* --- NEW: Dynamic Cup Display --- */}
+                <Text style={styles.taskTitle}>
+                  {machineData?.cupPresent === false ? "No" : "Yes"}
+                </Text>
                 <Text style={styles.taskSubtitle}>cup</Text>
               </View>
             </View>
@@ -190,7 +193,7 @@ export default function MachineInfoScreen() {
               </View>
               <View style={styles.taskText}>
                 <Text style={styles.taskTitle}>
-                  {machineData?.boilerTemp ?? "--"}Â°C
+                  {machineData?.boilerTemp ?? "--"}°F
                 </Text>
                 <Text style={styles.taskSubtitle}>water temp</Text>
               </View>
@@ -222,17 +225,6 @@ export default function MachineInfoScreen() {
             </View>
           </View>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.unpairButton,
-            { backgroundColor: colors.primaryButton, marginBottom: 15 },
-          ]}
-          onPress={handleRefill}
-          activeOpacity={0.8}
-        >
-          <Droplet color="#fff" size={20} />
-          <Text style={styles.unpairText}>Refill Machine</Text>
-        </TouchableOpacity>
         {/* --- Unpair Button --- */}
         <TouchableOpacity
           style={styles.unpairButton}

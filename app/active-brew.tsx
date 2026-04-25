@@ -29,7 +29,9 @@ type BrewStep =
   | "ERROR_DISPENSER"
   | "ERROR_WATER"
   | "DISPENSING"
-  | "DONE";
+  | "DONE"
+  | "ERROR_INTERRUPTED"
+  | "ERROR_INTERRUPTED_DISPENSING";
 
 export default function ActiveBrewScreen() {
   const router = useRouter();
@@ -41,6 +43,9 @@ export default function ActiveBrewScreen() {
   const [currentStep, setCurrentStep] = useState<BrewStep>("INSTRUCT_GRINDER");
   const [progress, setProgress] = useState(0);
 
+  const [isDisconnected, setIsDisconnected] = useState(false);
+  const [hasBeenInterrupted, setHasBeenInterrupted] = useState(false);
+
   // --- Dynamic Theme Colors ---
   const bgColor = isDark ? colors.background : "#FFF1E5";
   const textColor = isDark ? colors.text : "#9C4400";
@@ -48,6 +53,11 @@ export default function ActiveBrewScreen() {
   const btnBgColor = isDark ? colors.primaryButton : "#FFDEBA";
   const btnTextColor = isDark ? "#F0CEAB" : "#000000";
   const progressBgColor = isDark ? "#333" : "#E5E5E5";
+
+  // --- NEW: Track State Changes in Terminal ---
+  useEffect(() => {
+    console.log(`[Brew State]  Screen updated to: ${currentStep}`);
+  }, [currentStep]);
 
   // --- INCREMENT STATS ON FINISH ---
   useEffect(() => {
@@ -70,9 +80,51 @@ export default function ActiveBrewScreen() {
 
   // --- HARDWARE POLLING ---
   useEffect(() => {
+    let isPolling = false;
+
     const interval = setInterval(async () => {
+      if (isPolling) return;
+      isPolling = true;
+
       const machine = await getMachineStatus();
-      if (!machine) return;
+
+      // Lost connection
+      if (!machine) {
+        if (!isDisconnected) {
+          console.log(
+            " [Network] Connection lost to machine! Waiting for reconnect...",
+          );
+          setIsDisconnected(true);
+        }
+        isPolling = false;
+        return;
+      }
+
+      // Re-established connection
+      if (isDisconnected) {
+        console.log(
+          ` [Network] Reconnected! Machine woke up with status: ${machine.status}`,
+        );
+        setIsDisconnected(false);
+
+        if (machine.status === "IDLE") {
+          if (currentStep === "GRINDING") {
+            console.log(
+              " [Recovery] Machine lost power during GRINDING. Forcing full restart.",
+            );
+            setCurrentStep("ERROR_INTERRUPTED");
+            isPolling = false;
+            return;
+          } else if (currentStep === "DISPENSING") {
+            console.log(
+              " [Recovery] Machine lost power during DISPENSING. Forcing resume at water pump.",
+            );
+            setCurrentStep("ERROR_INTERRUPTED_DISPENSING");
+            isPolling = false;
+            return;
+          }
+        }
+      }
 
       if (machine.status === "GRIND") {
         setCurrentStep("GRINDING");
@@ -84,34 +136,49 @@ export default function ActiveBrewScreen() {
       } else if (["PUMP", "HEAT", "DISPENSE"].includes(machine.status)) {
         setCurrentStep("DISPENSING");
       } else if (machine.status === "IDLE" && currentStep === "DISPENSING") {
+        console.log(" [Brew Complete] Machine is IDLE and dispensing is done!");
         setCurrentStep("DONE");
+      } else if (machine.status === "IDLE" && currentStep === "GRINDING") {
+        console.log(
+          " [Glitch Catch] Machine is IDLE during Grinding. Throwing interruption error.",
+        );
+        setCurrentStep("ERROR_INTERRUPTED");
       }
+
+      isPolling = false;
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentStep]);
+  }, [currentStep, isDisconnected]);
 
   // --- VISUAL PROGRESS BAR TRICK ---
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (currentStep === "GRINDING" || currentStep === "DISPENSING") {
+    if (
+      !isDisconnected &&
+      (currentStep === "GRINDING" || currentStep === "DISPENSING")
+    ) {
       setProgress(0);
       interval = setInterval(() => {
         setProgress((prev) => (prev < 95 ? prev + 3 : 95));
       }, 200);
     }
     return () => clearInterval(interval);
-  }, [currentStep]);
+  }, [currentStep, isDisconnected]);
 
   // --- ACTION HANDLERS ---
   const handleStartGrinding = async () => {
+    console.log(" [Action] User clicked Start Grinding...");
     const machine = await getMachineStatus();
     if (machine) {
-      // FIX: Check beanLevel percentage (Simulation takes 5% per brew)
       if (machine.beanLevel < 5) {
+        console.log(" [Hardware Check] Failed: Not enough beans.");
         setCurrentStep("ERROR_BEANS");
+      } else if (machine.cupPresent === false) {
+        console.log(" [Hardware Check] Failed: No cup present.");
+        setCurrentStep("ERROR_GRINDER");
       } else {
-        // We bypass the cup detection for the simulation demo
+        console.log(" [Hardware Check] Passed. Sending START_GRIND command.");
         await sendMachineCommand("START_GRIND");
         setCurrentStep("GRINDING");
       }
@@ -119,13 +186,19 @@ export default function ActiveBrewScreen() {
   };
 
   const handleStartDispensing = async () => {
+    console.log(" [Action] User clicked Start Dispensing...");
     const machine = await getMachineStatus();
     if (machine) {
-      // FIX: Check waterLevel percentage (Simulation takes 15% per brew)
       if (machine.waterLevel < 15) {
+        console.log(" [Hardware Check] Failed: Not enough water.");
         setCurrentStep("ERROR_WATER");
+      } else if (machine.cupPresent === false) {
+        console.log(" [Hardware Check] Failed: No cup present.");
+        setCurrentStep("ERROR_DISPENSER");
       } else {
-        // We bypass the cup detection for the simulation demo
+        console.log(
+          " [Hardware Check] Passed. Sending START_DISPENSE command.",
+        );
         await sendMachineCommand("START_DISPENSE");
         setCurrentStep("DISPENSING");
       }
@@ -135,10 +208,10 @@ export default function ActiveBrewScreen() {
   const handleFinish = () => {
     router.replace("/(tabs)/home");
   };
+
   const handleQA = () => {
     router.push({
       pathname: "/qa-rating",
-      // --- UPDATE: Pass it forward again! ---
       params: {
         name: name as string,
         isCustom: isCustom as string,
@@ -217,6 +290,22 @@ export default function ActiveBrewScreen() {
     </View>
   );
 
+  const renderDisconnected = () => (
+    <View style={styles.centerContent}>
+      <Text style={[styles.title, { color: "#FF3B30" }]}>Connection Lost</Text>
+      <Text style={[styles.subtitle, { color: subtextColor }]}>
+        Lost connection to the coffee machine. Please check the power and WiFi.
+        We will automatically resume when it reconnects.
+      </Text>
+      <LottieView
+        source={require("../assets/lottie/Loading coffee bean.json")}
+        autoPlay
+        loop
+        style={styles.lottie}
+      />
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -228,98 +317,142 @@ export default function ActiveBrewScreen() {
       </View>
 
       <View style={styles.mainArea}>
-        {currentStep === "INSTRUCT_GRINDER" &&
-          renderInstruction(
-            "Add Cup Under Grinder",
-            "Place your empty filter cup exactly under the grinder spout.",
-            handleStartGrinding,
-          )}
+        {isDisconnected ? (
+          renderDisconnected()
+        ) : (
+          <>
+            {currentStep === "INSTRUCT_GRINDER" &&
+              renderInstruction(
+                hasBeenInterrupted
+                  ? "Restarting Brew"
+                  : "Add Cup Under Grinder",
+                hasBeenInterrupted
+                  ? "Place your empty filter cup back under the grinder to restart and continue your brew."
+                  : "Place your empty filter cup exactly under the grinder spout.",
+                handleStartGrinding,
+              )}
 
-        {currentStep === "ERROR_GRINDER" &&
-          renderError(
-            "No Cup Detected",
-            "Please insert the filter cup securely under the grinder and try again.",
-            handleStartGrinding,
-          )}
+            {currentStep === "ERROR_GRINDER" &&
+              renderError(
+                "No Cup Detected",
+                "Please insert the filter cup securely under the grinder and try again.",
+                handleStartGrinding,
+              )}
 
-        {currentStep === "ERROR_BEANS" &&
-          renderError(
-            "Out of Beans",
-            "Please refill the coffee beans in the hopper to continue.",
-            handleStartGrinding,
-          )}
+            {currentStep === "ERROR_BEANS" &&
+              renderError(
+                "Out of Beans",
+                "Please refill the coffee beans in the hopper to continue.",
+                handleStartGrinding,
+              )}
 
-        {currentStep === "GRINDING" &&
-          renderProgress(
-            "Grinding Beans...",
-            require("../assets/lottie/Loading coffee bean.json"),
-          )}
+            {currentStep === "GRINDING" &&
+              renderProgress(
+                "Grinding Beans...",
+                require("../assets/lottie/Loading coffee bean.json"),
+              )}
 
-        {currentStep === "INSTRUCT_DISPENSER" &&
-          renderInstruction(
-            "Move Filtered Cup",
-            "Carefully slide the filtered cup with grinded beans under the water dispenser.",
-            handleStartDispensing,
-          )}
+            {currentStep === "INSTRUCT_DISPENSER" &&
+              renderInstruction(
+                hasBeenInterrupted ? "Resume Extraction" : "Move Filtered Cup",
+                hasBeenInterrupted
+                  ? "Ensure your cup is under the water dispenser to finish pouring your coffee."
+                  : "Carefully slide the filtered cup with grinded beans under the water dispenser.",
+                handleStartDispensing,
+              )}
 
-        {currentStep === "ERROR_DISPENSER" &&
-          renderError(
-            "Cup Not Found",
-            "Please ensure the cup is aligned directly under the water dispenser.",
-            handleStartDispensing,
-          )}
+            {currentStep === "ERROR_DISPENSER" &&
+              renderError(
+                "Cup Not Found",
+                "Please ensure the cup is aligned directly under the water dispenser.",
+                handleStartDispensing,
+              )}
 
-        {currentStep === "ERROR_WATER" &&
-          renderError(
-            "Out of Water",
-            "Please refill the water tank to continue.",
-            handleStartDispensing,
-          )}
+            {currentStep === "ERROR_WATER" &&
+              renderError(
+                "Out of Water",
+                "Please refill the water tank to continue.",
+                handleStartDispensing,
+              )}
 
-        {currentStep === "DISPENSING" &&
-          renderProgress(
-            "Extracting Coffee...",
-            require("../assets/lottie/Drip coffee.json"),
-          )}
+            {currentStep === "DISPENSING" &&
+              renderProgress(
+                "Extracting Coffee...",
+                require("../assets/lottie/Drip coffee.json"),
+              )}
 
-        {currentStep === "DONE" && (
-          <View style={styles.centerContent}>
-            <Text style={[styles.title, { color: textColor, fontSize: 32 }]}>
-              Enjoy your Coffee!
-            </Text>
-            <LottieView
-              source={require("../assets/lottie/Shiba Coffee-relax")}
-              autoPlay
-              loop={false}
-              style={styles.lottie}
-            />
+            {currentStep === "ERROR_INTERRUPTED" &&
+              renderError(
+                "Brew Interrupted",
+                "The machine lost power during grinding. Please empty your filter cup and try again.",
+                () => {
+                  console.log(
+                    " [Action] User acknowledged grinding interruption. Restarting...",
+                  );
+                  setHasBeenInterrupted(true);
+                  setCurrentStep("INSTRUCT_GRINDER");
+                },
+              )}
 
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.secondaryBtn, { borderColor: btnBgColor }]}
-                onPress={handleQA}
-              >
-                <Text style={[styles.secondaryBtnText, { color: textColor }]}>
-                  Q/A
+            {currentStep === "ERROR_INTERRUPTED_DISPENSING" &&
+              renderError(
+                "Extraction Interrupted",
+                "The machine lost connection while pouring water. Check your cup, and resume the pour when ready.",
+                () => {
+                  console.log(
+                    " [Action] User acknowledged pouring interruption. Resuming extraction...",
+                  );
+                  setHasBeenInterrupted(true);
+                  setCurrentStep("INSTRUCT_DISPENSER");
+                },
+              )}
+
+            {currentStep === "DONE" && (
+              <View style={styles.centerContent}>
+                <Text
+                  style={[styles.title, { color: textColor, fontSize: 32 }]}
+                >
+                  Enjoy your Coffee!
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.primaryBtn,
-                  {
-                    backgroundColor: btnBgColor,
-                    flex: 1,
-                    marginHorizontal: 0,
-                  },
-                ]}
-                onPress={handleFinish}
-              >
-                <Text style={[styles.primaryBtnText, { color: btnTextColor }]}>
-                  Finish
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                <LottieView
+                  source={require("../assets/lottie/Shiba Coffee-relax")}
+                  autoPlay
+                  loop={false}
+                  style={styles.lottie}
+                />
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.secondaryBtn, { borderColor: btnBgColor }]}
+                    onPress={handleQA}
+                  >
+                    <Text
+                      style={[styles.secondaryBtnText, { color: textColor }]}
+                    >
+                      Q/A
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryBtn,
+                      {
+                        backgroundColor: btnBgColor,
+                        flex: 1,
+                        marginHorizontal: 0,
+                      },
+                    ]}
+                    onPress={handleFinish}
+                  >
+                    <Text
+                      style={[styles.primaryBtnText, { color: btnTextColor }]}
+                    >
+                      Finish
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </>
         )}
       </View>
     </SafeAreaView>

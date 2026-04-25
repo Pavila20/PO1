@@ -10,7 +10,6 @@ import {
   Droplet,
   LogOut,
   Moon,
-  Smartphone,
   Sun,
   Thermometer,
   Trash2,
@@ -293,25 +292,7 @@ export default function HomeScreen() {
                     }}
                   />
                 </View>
-
-                <View style={[styles.menuRow, styles.themeRow]}>
-                  <Smartphone color={colors.text} size={20} />
-                  <Text
-                    style={[styles.menuText, { color: colors.text, flex: 1 }]}
-                  >
-                    System Theme
-                  </Text>
-                  <Switch
-                    value={mode === "system"}
-                    onValueChange={(val) => setMode(val ? "system" : theme)}
-                    trackColor={{
-                      false: "#767577",
-                      true: colors.primaryButton,
-                    }}
-                  />
-                </View>
               </View>
-
               <View
                 style={[
                   styles.menuDivider,

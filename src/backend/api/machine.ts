@@ -30,7 +30,7 @@ export async function getMachineStatus() {
     if (!response.ok) return null;
     return await response.json();
   } catch (error) {
-    console.log(`⚠️ Failed to connect to machine at ${MACHINE_URL}`);
+    console.log(` Failed to connect to machine at ${MACHINE_URL}`);
     return null;
   }
 }
@@ -50,12 +50,12 @@ export async function sendBrewCommand(recipe: string, strength: string) {
     if (!response.ok) return { success: false };
     return await response.json();
   } catch (error) {
-    console.error("❌ Failed to send brew command:", error);
+    console.error(" Failed to send brew command:", error);
     return { success: false };
   }
 }
 
-// 👇 NEW: Send specific step-by-step commands to the hardware
+// NEW: Send specific step-by-step commands to the hardware
 export async function sendMachineCommand(command: string) {
   try {
     if (!MACHINE_URL) return { success: false };
@@ -71,7 +71,7 @@ export async function sendMachineCommand(command: string) {
     if (!response.ok) return { success: false };
     return await response.json();
   } catch (error) {
-    console.error(`❌ Failed to send command ${command}:`, error);
+    console.error(` Failed to send command ${command}:`, error);
     return { success: false };
   }
 }

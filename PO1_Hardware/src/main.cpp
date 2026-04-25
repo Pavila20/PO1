@@ -25,6 +25,9 @@ int beanLevel = 100;
 int boilerTemp = 200;
 bool waterLevelWarning = false;
 
+// --- NEW: Cup Sensor Variable ---
+bool cupPresent = true; 
+
 unsigned long actionStartTime = 0;
 
 // =========================================================
@@ -59,6 +62,9 @@ void handleStatus() {
   doc["beanLevel"] = beanLevel;
   doc["waterLevel"] = waterLevel;
   doc["waterLevelWarning"] = waterLevelWarning;
+  
+  // --- NEW: Report Cup Status to React Native ---
+  doc["cupPresent"] = cupPresent; 
 
   String response;
   serializeJson(doc, response);
@@ -100,21 +106,34 @@ void handleCommand() {
     waterLevel = 100;
     beanLevel = 100;
     waterLevelWarning = false;
+    cupPresent = true; // Reset cup status on refill
     currentState = IDLE;
     Serial.println("TEST: Refilled machine!");
     server.send(200, "application/json", "{\"success\":true}");
   }
   else if (command == "EMPTY_WATER") {
-    waterLevel = 4; // Below the 15% threshold to trigger the error in the app
+    waterLevel = 4;
     waterLevelWarning = true;
     Serial.println("TEST: Emptied water tank!");
     server.send(200, "application/json", "{\"success\":true}");
   }
   else if (command == "EMPTY_BEANS") {
-    beanLevel = 2; // Below the 5% threshold
+    beanLevel = 2;
     Serial.println("TEST: Emptied bean hopper!");
     server.send(200, "application/json", "{\"success\":true}");
   }
+  
+  else if (command == "REMOVE_CUP") {
+    cupPresent = false;
+    Serial.println("TEST: Cup Removed!");
+    server.send(200, "application/json", "{\"success\":true}");
+  }
+  else if (command == "PLACE_CUP") {
+    cupPresent = true;
+    Serial.println("TEST: Cup Placed!");
+    server.send(200, "application/json", "{\"success\":true}");
+  }
+
   else if (command == "TRIGGER_ERROR") {
     currentState = ERROR;
     Serial.println("TEST: Machine error state triggered!");
@@ -125,7 +144,6 @@ void handleCommand() {
     Serial.println("TEST: Cleared error state!");
     server.send(200, "application/json", "{\"success\":true}");
   }
-  
   else {
     server.send(400, "application/json", "{\"success\":false, \"message\":\"Unknown command\"}");
   }
@@ -137,12 +155,9 @@ void handleCommand() {
 
 void setup() {
   Serial.begin(115200);
-  
-  // ADD THIS LINE: Wait 3 seconds for Windows/Mac to open the USB Serial Monitor!
   delay(3000); 
   
   Serial.println("\n=== MACHINE AWAKE & STARTING ===");
-
   WiFi.mode(WIFI_STA);
 
   Serial.println("\nConnecting to TAMU_IoT...");
@@ -174,7 +189,6 @@ void setup() {
 void loop() {
   server.handleClient();
 
-  // --- HARDWARE SIMULATION LOGIC ---
   if (currentState == GRIND) {
     if (millis() - actionStartTime > 5000) { 
       currentState = USER_PROMPT; 
