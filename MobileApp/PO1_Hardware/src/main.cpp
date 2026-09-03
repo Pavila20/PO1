@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 
 // ---> HOME WIFI <---
-const char* WIFI_SSID     = ENV_HOME_SSID;
+const char* WIFI_SSID = ENV_HOME_SSID;
 const char* WIFI_PASSWORD = ENV_HOME_PASSWORD;
 
 // ---> SCHOOL WIFI (TAMU) <---
