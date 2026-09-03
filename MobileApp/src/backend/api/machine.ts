@@ -55,7 +55,7 @@ export async function sendBrewCommand(recipe: string, strength: string) {
   }
 }
 
-// NEW: Send specific step-by-step commands to the hardware
+// Send specific step-by-step commands to the hardware
 export async function sendMachineCommand(command: string) {
   try {
     if (!MACHINE_URL) return { success: false };

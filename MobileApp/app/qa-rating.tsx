@@ -85,7 +85,7 @@ export default function QARatingScreen() {
         waterVolume: currentProfileUsed.waterVolume,
       });
 
-      // --- AI LEARNING LOGIC ---
+      // LEARNING LOGIC ---
       const optimizedRecipe = calculateNewProfile(
         currentProfileUsed as PourProfile,
         score,
@@ -107,7 +107,7 @@ export default function QARatingScreen() {
 
       // Overwrite the existing profile in AWS instead of making a new one
       await savePourProfile(optimizedRecipe);
-      console.log("AI-Optimized Cup successfully updated in AWS!");
+      console.log("Cup successfully updated in AWS!");
     } catch (error) {
       console.error("Failed to sync feedback with AWS:", error);
     }
