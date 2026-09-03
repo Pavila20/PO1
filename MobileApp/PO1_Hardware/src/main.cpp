@@ -3,13 +3,13 @@
 #include <WebServer.h>
 #include <ArduinoJson.h>
 
-// =========================================================
-// WIFI CONFIGURATION (TAMU_IoT MAC Authenticated)
-// =========================================================
-const char* WIFI_SSID     = "TAMU_IoT";        
-const char* WIFI_PASSWORD = "";    // Leave empty! 
-//const char* WIFI_SSID     = "Reveille Ranch Resident";        
-//const char* WIFI_PASSWORD = "YN85V2DRFQ4KJ9ZT";
+// ---> HOME WIFI <---
+const char* WIFI_SSID     = ENV_HOME_SSID;
+const char* WIFI_PASSWORD = ENV_HOME_PASSWORD;
+
+// ---> SCHOOL WIFI (TAMU) <---
+// const char* WIFI_SSID     = ENV_SCHOOL_SSID;
+// const char* WIFI_PASSWORD = ENV_SCHOOL_PASSWORD;
 const int SERVER_PORT     = 80;
 
 WebServer server(SERVER_PORT);
