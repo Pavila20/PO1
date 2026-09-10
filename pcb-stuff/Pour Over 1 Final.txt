@@ -1,0 +1,10 @@
+Board Information Report
+Filename     : C:\Users\Public\Documents\Altium\ECEN 404 Pour Over Board\Pour Over 1 Final.PcbDoc
+Date         : 9/5/2026
+Time         : 9:31:30 PM
+Time Elapsed : 00:00:00
+
+General
+    Board Size, 6000milsx4000mils
+    Components on board, 45
+count : 2
