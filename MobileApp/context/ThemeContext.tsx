@@ -38,7 +38,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // Determine the active theme based on mode setting and system preference
-  const activeTheme = mode === "system" ? systemScheme || "light" : mode;
+  const activeTheme = mode === "system" ? (systemScheme === "dark" ? "dark" : "light") : mode;
 
   return (
     <ThemeContext.Provider

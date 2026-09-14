@@ -272,7 +272,7 @@ export default function CoffeeDetailsScreen() {
           <View style={styles.tutorialContainer}>
             <View
               style={[
-                StyleSheet.absoluteFillObject,
+                StyleSheet.absoluteFill,
                 { backgroundColor: isDark ? "rgba(44, 41, 41, 1)" : "#FFF1E5" },
               ]}
             >
@@ -284,7 +284,7 @@ export default function CoffeeDetailsScreen() {
                     "rgba(12, 15, 20, 1)",
                   ]}
                   locations={[0, 0.56, 1]}
-                  style={StyleSheet.absoluteFillObject}
+                  style={StyleSheet.absoluteFill}
                 />
               )}
             </View>
