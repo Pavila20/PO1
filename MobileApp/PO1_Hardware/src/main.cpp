@@ -2,14 +2,25 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
+#include <string.h>
 
-// ---> HOME WIFI <---
-const char* WIFI_SSID = ENV_HOME_SSID;
-const char* WIFI_PASSWORD = ENV_HOME_PASSWORD;
+// Tries HOME first, then SCHOOL (TAMU_IoT), automatically at boot — no more
+// hand-editing which pair is commented out when you change locations.
+// See connectToWifi(). Values come from PO1_Hardware/.env via platformio.ini's
+// ${sysenv.*} substitution (use flash.ps1 to load them before building).
+struct WifiCandidate {
+  const char* ssid;
+  const char* password;
+  const char* label;
+};
 
-// ---> SCHOOL WIFI (TAMU) <---
-// const char* WIFI_SSID     = ENV_SCHOOL_SSID;
-// const char* WIFI_PASSWORD = ENV_SCHOOL_PASSWORD;
+WifiCandidate WIFI_CANDIDATES[] = {
+  { ENV_HOME_SSID, ENV_HOME_PASSWORD, "HOME" },
+  { ENV_SCHOOL_SSID, ENV_SCHOOL_PASSWORD, "SCHOOL" },
+};
+const int WIFI_CANDIDATE_COUNT = sizeof(WIFI_CANDIDATES) / sizeof(WIFI_CANDIDATES[0]);
+const int WIFI_ATTEMPTS_PER_NETWORK = 20; // ~10s per network at 500ms/attempt
+
 const int SERVER_PORT     = 80;
 
 WebServer server(SERVER_PORT);
@@ -153,28 +164,60 @@ void handleCommand() {
 // SETUP & MAIN LOOP
 // =========================================================
 
-void setup() {
-  Serial.begin(115200);
-  delay(3000); 
-  
-  Serial.println("\n=== MACHINE AWAKE & STARTING ===");
-  WiFi.mode(WIFI_STA);
-
-  Serial.println("\nConnecting to TAMU_IoT...");
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-    if (attempts > 30) {
-      Serial.println("\nNetwork rejecting connection. (If you just registered, wait 15 mins for TAMU routers to update!)");
-      attempts = 0; 
+void scanNetworks() {
+  Serial.println("\nScanning for visible WiFi networks (ESP32 only sees 2.4GHz)...");
+  int n = WiFi.scanNetworks();
+  if (n == 0) {
+    Serial.println("  No networks found at all.");
+  } else {
+    for (int i = 0; i < n; i++) {
+      Serial.printf("  %d: \"%s\" (RSSI %d, %s)\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i),
+                    WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "open" : "secured");
     }
   }
+  Serial.println();
+}
 
-  Serial.println("\n Connected to WiFi!");
+void connectToWifi() {
+  WiFi.mode(WIFI_STA);
+  scanNetworks();
+
+  while (true) {
+    for (int i = 0; i < WIFI_CANDIDATE_COUNT; i++) {
+      WifiCandidate candidate = WIFI_CANDIDATES[i];
+      if (strlen(candidate.ssid) == 0) continue; // credential not set in .env
+
+      Serial.printf("\nTrying %s WiFi (%s)...\n", candidate.label, candidate.ssid);
+      WiFi.begin(candidate.ssid, candidate.password);
+
+      int attempts = 0;
+      while (WiFi.status() != WL_CONNECTED && attempts < WIFI_ATTEMPTS_PER_NETWORK) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+      }
+
+      if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("\nConnected to %s WiFi!\n", candidate.label);
+        return;
+      }
+
+      Serial.printf("\n%s WiFi not reachable (WiFi.status()=%d), trying next...\n", candidate.label, WiFi.status());
+      WiFi.disconnect(); // NOTE: do not pass `true` here - it fully tears down
+                          // the WiFi driver and crashes on the next WiFi.begin()
+      delay(200);
+    }
+    Serial.println("\nNo known network found. Retrying... (If you just registered for TAMU_IoT, wait 15 min for routers to update!)");
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(3000);
+
+  Serial.println("\n=== MACHINE AWAKE & STARTING ===");
+  connectToWifi();
+
   Serial.print(" Machine IP Address: ");
   Serial.println(WiFi.localIP());
 
