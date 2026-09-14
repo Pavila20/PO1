@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PO1 BLE Test</title>
+<style>
+  body { font-family: sans-serif; max-width: 480px; margin: 40px auto; padding: 0 20px; }
+  button { padding: 10px 16px; font-size: 15px; margin: 6px 4px 6px 0; cursor: pointer; }
+  #status { font-size: 18px; font-weight: bold; margin: 16px 0; padding: 12px; background: #f0f0f0; border-radius: 8px; white-space: pre-wrap; }
+  #log { font-family: monospace; font-size: 12px; background: #1e1e1e; color: #6f6; padding: 10px; height: 220px; overflow-y: auto; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <h2>PourOver1 BLE Test</h2>
+  <p>Requires Chrome or Edge, served over http://localhost (not file://).</p>
+  <button id="connectBtn">Connect to PourOver1-BLE-Test</button>
+  <div id="status">Not connected</div>
+  <div>
+    <button data-cmd="START_GRIND">Send START_GRIND</button>
+    <button data-cmd="START_DISPENSE">Send START_DISPENSE</button>
+    <button data-cmd="RESET">Send RESET</button>
+  </div>
+  <div id="log"></div>
+
+<script>
+const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const STATUS_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const COMMAND_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+let commandChar = null;
+const logEl = document.getElementById('log');
+const statusEl = document.getElementById('status');
+
+function log(msg) {
+  const line = document.createElement('div');
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+document.getElementById('connectBtn').addEventListener('click', async () => {
+  try {
+    if (!navigator.bluetooth) {
+      throw new Error('Web Bluetooth not available. Use Chrome or Edge over http://localhost.');
+    }
+    log('Requesting device...');
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SERVICE_UUID] }]
+    });
+    log(`Selected device: ${device.name}`);
+
+    device.addEventListener('gattserverdisconnected', () => {
+      log('Disconnected');
+      statusEl.textContent = 'Disconnected';
+    });
+
+    const server = await device.gatt.connect();
+    log('Connected to GATT server');
+
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    const statusChar = await service.getCharacteristic(STATUS_CHAR_UUID);
+    commandChar = await service.getCharacteristic(COMMAND_CHAR_UUID);
+
+    await statusChar.startNotifications();
+    statusChar.addEventListener('characteristicvaluechanged', (event) => {
+      const value = new TextDecoder().decode(event.target.value);
+      statusEl.textContent = value;
+      log(`Status update: ${value}`);
+    });
+
+    log('Subscribed to status notifications');
+  } catch (err) {
+    log(`Error: ${err.message}`);
+  }
+});
+
+document.querySelectorAll('button[data-cmd]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    if (!commandChar) {
+      log('Not connected yet');
+      return;
+    }
+    const cmd = btn.dataset.cmd;
+    await commandChar.writeValue(new TextEncoder().encode(cmd));
+    log(`Sent command: ${cmd}`);
+  });
+});
+</script>
+</body>
+</html>

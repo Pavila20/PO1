@@ -1,0 +1,114 @@
+// Standalone BLE proof-of-concept for PO1.
+// Advertises as "PourOver1-BLE-Test" with one NOTIFY characteristic (status)
+// and one WRITE characteristic (command), using the Nordic UART Service UUIDs
+// so generic BLE scanner apps (nRF Connect, LightBlue) can also poke at it.
+//
+// This does not touch WiFi, the REST API, or PO1_Hardware/main.cpp at all —
+// it is purely to prove BLE works end-to-end before deciding whether to
+// integrate it into the real app.
+
+#include <Arduino.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+#include <ArduinoJson.h>
+
+#define SERVICE_UUID      "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+#define STATUS_CHAR_UUID  "6e400003-b5a3-f393-e0a9-e50e24dcca9e" // NOTIFY: device -> app
+#define COMMAND_CHAR_UUID "6e400002-b5a3-f393-e0a9-e50e24dcca9e" // WRITE:  app -> device
+
+BLECharacteristic *pStatusChar = nullptr;
+BLECharacteristic *pCommandChar = nullptr;
+bool deviceConnected = false;
+
+// Mirrors the shape of simulator/server.js's machineState so it feels familiar.
+String machineStatus = "IDLE";
+int waterLevel = 80;
+int beanLevel = 80;
+float boilerTemp = 22.0;
+
+class ServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer *server) override {
+    deviceConnected = true;
+    Serial.println("[BLE] Client connected");
+  }
+  void onDisconnect(BLEServer *server) override {
+    deviceConnected = false;
+    Serial.println("[BLE] Client disconnected, resuming advertising");
+    BLEDevice::startAdvertising();
+  }
+};
+
+class CommandCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *characteristic) override {
+    String value = characteristic->getValue().c_str();
+    Serial.print("[BLE] Command received: ");
+    Serial.println(value);
+
+    if (value == "START_GRIND") {
+      machineStatus = "GRIND";
+      beanLevel = max(0, beanLevel - 5);
+    } else if (value == "START_DISPENSE") {
+      machineStatus = "DISPENSE";
+      waterLevel = max(0, waterLevel - 15);
+    } else if (value == "RESET") {
+      machineStatus = "IDLE";
+    }
+  }
+};
+
+void sendStatusUpdate() {
+  StaticJsonDocument<200> doc;
+  doc["status"] = machineStatus;
+  doc["waterLevel"] = waterLevel;
+  doc["beanLevel"] = beanLevel;
+  doc["boilerTemp"] = boilerTemp;
+
+  String json;
+  serializeJson(doc, json);
+
+  pStatusChar->setValue(json.c_str());
+  pStatusChar->notify();
+  Serial.print("[BLE] Notified: ");
+  Serial.println(json);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n=== PO1 BLE Test Starting ===");
+
+  BLEDevice::init("PourOver1-BLE-Test");
+  BLEServer *pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new ServerCallbacks());
+
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  pStatusChar = pService->createCharacteristic(
+      STATUS_CHAR_UUID,
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  pStatusChar->addDescriptor(new BLE2902());
+
+  pCommandChar = pService->createCharacteristic(
+      COMMAND_CHAR_UUID, BLECharacteristic::PROPERTY_WRITE);
+  pCommandChar->setCallbacks(new CommandCallbacks());
+
+  pService->start();
+
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  BLEDevice::startAdvertising();
+
+  Serial.println("[BLE] Advertising as 'PourOver1-BLE-Test'");
+}
+
+unsigned long lastNotify = 0;
+
+void loop() {
+  if (deviceConnected && millis() - lastNotify > 2000) {
+    sendStatusUpdate();
+    lastNotify = millis();
+  }
+}
