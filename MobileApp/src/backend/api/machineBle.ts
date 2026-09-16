@@ -63,6 +63,27 @@ export async function connectToMachineBle(): Promise<boolean> {
             await connected.discoverAllServicesAndCharacteristics();
             connectedDevice = connected;
 
+            // Read the current value immediately rather than waiting for
+            // the next periodic notify (up to 2s away) - otherwise the
+            // very first getMachineStatusBle() call right after connecting
+            // can return null even though the connection succeeded, which
+            // would wrongly show "machine not found" on the setup screen.
+            try {
+              const initial = await connected.readCharacteristicForService(
+                SERVICE_UUID,
+                STATUS_CHAR_UUID,
+              );
+              if (initial.value) {
+                const json = Buffer.from(initial.value, "base64").toString(
+                  "utf8",
+                );
+                latestStatus = JSON.parse(json);
+              }
+            } catch {
+              // fall through - the notify subscription below will still
+              // populate latestStatus shortly
+            }
+
             connected.monitorCharacteristicForService(
               SERVICE_UUID,
               STATUS_CHAR_UUID,
