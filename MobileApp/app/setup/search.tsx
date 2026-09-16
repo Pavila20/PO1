@@ -1,15 +1,8 @@
 // app/setup/search.tsx
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { getMachineStatus } from "../../src/backend/api/machine"; // Import our API
@@ -50,28 +43,8 @@ export default function SetupSearch() {
 
         <Text style={[styles.title, { color: colors.text }]}>{statusText}</Text>
         <Text style={[styles.subtitle, { color: colors.subtext }]}>
-          Make sure your machine is turned on and connected to the same network.
+          Make sure your machine is turned on and within Bluetooth range.
         </Text>
-
-        {/* TEMP: bypass WiFi pairing to reach home for BLE testing, remove before merging to main */}
-        <TouchableOpacity
-          style={{
-            marginTop: 30,
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            borderRadius: 8,
-            backgroundColor: "#333",
-          }}
-          onPress={async () => {
-            await AsyncStorage.setItem("is_setup_complete", "true");
-            await AsyncStorage.setItem("isMachinePaired", "true");
-            router.replace("/(tabs)/home");
-          }}
-        >
-          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
-            Skip to Home (dev)
-          </Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
