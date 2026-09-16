@@ -8,6 +8,8 @@
   button { padding: 10px 16px; font-size: 15px; margin: 6px 4px 6px 0; cursor: pointer; }
   h4 { margin: 18px 0 4px; }
   .danger { background: #ffe0e0; }
+  .levelRow { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .levelRow input { width: 60px; padding: 8px; font-size: 15px; }
   #status { font-size: 18px; font-weight: bold; margin: 16px 0; padding: 12px; background: #f0f0f0; border-radius: 8px; white-space: pre-wrap; }
   #log { font-family: monospace; font-size: 12px; background: #1e1e1e; color: #6f6; padding: 10px; height: 220px; overflow-y: auto; border-radius: 6px; }
 </style>
@@ -32,6 +34,14 @@
   </div>
 
   <h4>Levels</h4>
+  <div class="levelRow">
+    <input type="number" id="waterInput" min="0" max="100" value="50">
+    <button data-set="SET_WATER:" data-input="waterInput">Set Water %</button>
+  </div>
+  <div class="levelRow">
+    <input type="number" id="beansInput" min="0" max="100" value="50">
+    <button data-set="SET_BEANS:" data-input="beansInput">Set Bean %</button>
+  </div>
   <div>
     <button data-cmd="EMPTY_WATER">Empty Water</button>
     <button data-cmd="EMPTY_BEANS">Empty Beans</button>
@@ -105,6 +115,19 @@ document.querySelectorAll('button[data-cmd]').forEach((btn) => {
       return;
     }
     const cmd = btn.dataset.cmd;
+    await commandChar.writeValue(new TextEncoder().encode(cmd));
+    log(`Sent command: ${cmd}`);
+  });
+});
+
+document.querySelectorAll('button[data-set]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    if (!commandChar) {
+      log('Not connected yet');
+      return;
+    }
+    const input = document.getElementById(btn.dataset.input);
+    const cmd = `${btn.dataset.set}${input.value}`;
     await commandChar.writeValue(new TextEncoder().encode(cmd));
     log(`Sent command: ${cmd}`);
   });

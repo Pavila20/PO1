@@ -104,6 +104,20 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
       Serial.println("[BLE TEST] Error cleared!");
       sendStatusUpdate();
     }
+    // SET_WATER:<0-100> / SET_BEANS:<0-100> - set an exact level instead of
+    // just empty/full, e.g. to test the low-supply warning threshold.
+    else if (value.startsWith("SET_WATER:")) {
+      int level = constrain(value.substring(10).toInt(), 0, 100);
+      waterLevel = level;
+      waterLevelWarning = level < 15;
+      Serial.printf("[BLE TEST] Water level set to %d\n", level);
+      sendStatusUpdate();
+    } else if (value.startsWith("SET_BEANS:")) {
+      int level = constrain(value.substring(10).toInt(), 0, 100);
+      beanLevel = level;
+      Serial.printf("[BLE TEST] Bean level set to %d\n", level);
+      sendStatusUpdate();
+    }
   }
 };
 
