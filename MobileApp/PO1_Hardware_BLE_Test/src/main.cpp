@@ -18,9 +18,9 @@
 #define STATUS_CHAR_UUID  "6e400003-b5a3-f393-e0a9-e50e24dcca9e" // NOTIFY: device -> app
 #define COMMAND_CHAR_UUID "6e400002-b5a3-f393-e0a9-e50e24dcca9e" // WRITE:  app -> device
 
+BLEServer *pServer = nullptr;
 BLECharacteristic *pStatusChar = nullptr;
 BLECharacteristic *pCommandChar = nullptr;
-bool deviceConnected = false;
 
 // Mirrors the shape of simulator/server.js's machineState so it feels familiar.
 String machineStatus = "IDLE";
@@ -38,12 +38,15 @@ void sendStatusUpdate(); // forward declaration so CommandCallbacks can call it
 
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *server) override {
-    deviceConnected = true;
-    Serial.println("[BLE] Client connected");
+    Serial.printf("[BLE] Client connected (%d total)\n", server->getConnectedCount());
+    // Keep advertising even while connected, so a second device (e.g. the
+    // web dashboard) can still find and connect while the phone stays
+    // connected too - this board supports multiple simultaneous BLE
+    // connections, it just wasn't advertising after the first one.
+    BLEDevice::startAdvertising();
   }
   void onDisconnect(BLEServer *server) override {
-    deviceConnected = false;
-    Serial.println("[BLE] Client disconnected, resuming advertising");
+    Serial.printf("[BLE] Client disconnected (%d remaining), resuming advertising\n", server->getConnectedCount());
     BLEDevice::startAdvertising();
   }
 };
@@ -145,7 +148,7 @@ void setup() {
   Serial.println("\n=== PO1 BLE Test Starting ===");
 
   BLEDevice::init("PourOver1-BLE-Test");
-  BLEServer *pServer = BLEDevice::createServer();
+  pServer = BLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
 
   BLEService *pService = pServer->createService(SERVICE_UUID);
@@ -185,7 +188,7 @@ void loop() {
     sendStatusUpdate();
   }
 
-  if (deviceConnected && millis() - lastNotify > 2000) {
+  if (pServer->getConnectedCount() > 0 && millis() - lastNotify > 2000) {
     sendStatusUpdate();
     lastNotify = millis();
   }
