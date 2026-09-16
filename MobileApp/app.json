@@ -8,8 +8,10 @@
     "scheme": "po1",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "po1capstone",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pavila20.PO1"
     },
     "android": {
       "adaptiveIcon": {
@@ -52,6 +54,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "32a696f3-ab5c-41b6-b0a4-dcb2ec9f4cdb"
+      }
     }
   }
 }
