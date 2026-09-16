@@ -28,6 +28,12 @@ int waterLevel = 80;
 int beanLevel = 80;
 float boilerTemp = 22.0;
 
+unsigned long actionStartTime = 0;
+const unsigned long GRIND_DURATION_MS = 4000;    // GRIND -> USER_PROMPT
+const unsigned long DISPENSE_DURATION_MS = 6000; // DISPENSE -> IDLE
+
+void sendStatusUpdate(); // forward declaration so CommandCallbacks can call it
+
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *server) override {
     deviceConnected = true;
@@ -49,11 +55,16 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
     if (value == "START_GRIND") {
       machineStatus = "GRIND";
       beanLevel = max(0, beanLevel - 5);
+      actionStartTime = millis();
+      sendStatusUpdate(); // don't wait for the next periodic notify
     } else if (value == "START_DISPENSE") {
       machineStatus = "DISPENSE";
       waterLevel = max(0, waterLevel - 15);
+      actionStartTime = millis();
+      sendStatusUpdate();
     } else if (value == "RESET") {
       machineStatus = "IDLE";
+      sendStatusUpdate();
     }
   }
 };
@@ -107,6 +118,19 @@ void setup() {
 unsigned long lastNotify = 0;
 
 void loop() {
+  // Auto-advance the state machine, same idea as simulator/server.js's
+  // setTimeout chains - this was missing entirely before, which is why
+  // the app got stuck showing "Grinding..." forever.
+  if (machineStatus == "GRIND" && millis() - actionStartTime > GRIND_DURATION_MS) {
+    machineStatus = "USER_PROMPT";
+    Serial.println("[BLE] Grinding finished, waiting for user to move cup");
+    sendStatusUpdate();
+  } else if (machineStatus == "DISPENSE" && millis() - actionStartTime > DISPENSE_DURATION_MS) {
+    machineStatus = "IDLE";
+    Serial.println("[BLE] Dispensing finished, back to IDLE");
+    sendStatusUpdate();
+  }
+
   if (deviceConnected && millis() - lastNotify > 2000) {
     sendStatusUpdate();
     lastNotify = millis();
