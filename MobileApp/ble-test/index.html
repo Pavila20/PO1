@@ -6,6 +6,8 @@
 <style>
   body { font-family: sans-serif; max-width: 480px; margin: 40px auto; padding: 0 20px; }
   button { padding: 10px 16px; font-size: 15px; margin: 6px 4px 6px 0; cursor: pointer; }
+  h4 { margin: 18px 0 4px; }
+  .danger { background: #ffe0e0; }
   #status { font-size: 18px; font-weight: bold; margin: 16px 0; padding: 12px; background: #f0f0f0; border-radius: 8px; white-space: pre-wrap; }
   #log { font-family: monospace; font-size: 12px; background: #1e1e1e; color: #6f6; padding: 10px; height: 220px; overflow-y: auto; border-radius: 6px; }
 </style>
@@ -15,11 +17,33 @@
   <p>Requires Chrome or Edge, served over http://localhost (not file://).</p>
   <button id="connectBtn">Connect to PourOver1-BLE-Test</button>
   <div id="status">Not connected</div>
+
+  <h4>Brew</h4>
   <div>
-    <button data-cmd="START_GRIND">Send START_GRIND</button>
-    <button data-cmd="START_DISPENSE">Send START_DISPENSE</button>
-    <button data-cmd="RESET">Send RESET</button>
+    <button data-cmd="START_GRIND">START_GRIND</button>
+    <button data-cmd="START_DISPENSE">START_DISPENSE</button>
+    <button data-cmd="RESET">RESET</button>
   </div>
+
+  <h4>Cup sensor</h4>
+  <div>
+    <button data-cmd="REMOVE_CUP">Remove Cup</button>
+    <button data-cmd="PLACE_CUP">Place Cup</button>
+  </div>
+
+  <h4>Levels</h4>
+  <div>
+    <button data-cmd="EMPTY_WATER">Empty Water</button>
+    <button data-cmd="EMPTY_BEANS">Empty Beans</button>
+    <button data-cmd="REFILL">Refill Everything</button>
+  </div>
+
+  <h4>Errors</h4>
+  <div>
+    <button class="danger" data-cmd="TRIGGER_ERROR">Trigger Error</button>
+    <button data-cmd="CLEAR_ERROR">Clear Error</button>
+  </div>
+
   <div id="log"></div>
 
 <script>

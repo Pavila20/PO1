@@ -27,6 +27,8 @@ String machineStatus = "IDLE";
 int waterLevel = 80;
 int beanLevel = 80;
 float boilerTemp = 22.0;
+bool cupPresent = true;
+bool waterLevelWarning = false;
 
 unsigned long actionStartTime = 0;
 const unsigned long GRIND_DURATION_MS = 4000;    // GRIND -> USER_PROMPT
@@ -60,21 +62,59 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
     } else if (value == "START_DISPENSE") {
       machineStatus = "DISPENSE";
       waterLevel = max(0, waterLevel - 15);
+      if (waterLevel < 15) waterLevelWarning = true;
       actionStartTime = millis();
       sendStatusUpdate();
     } else if (value == "RESET") {
       machineStatus = "IDLE";
       sendStatusUpdate();
     }
+    // --- TESTING / SIMULATION COMMANDS (mirrors PO1_Hardware/main.cpp) ---
+    else if (value == "REFILL") {
+      waterLevel = 100;
+      beanLevel = 100;
+      waterLevelWarning = false;
+      cupPresent = true;
+      machineStatus = "IDLE";
+      Serial.println("[BLE TEST] Refilled machine!");
+      sendStatusUpdate();
+    } else if (value == "EMPTY_WATER") {
+      waterLevel = 4;
+      waterLevelWarning = true;
+      Serial.println("[BLE TEST] Emptied water tank!");
+      sendStatusUpdate();
+    } else if (value == "EMPTY_BEANS") {
+      beanLevel = 2;
+      Serial.println("[BLE TEST] Emptied bean hopper!");
+      sendStatusUpdate();
+    } else if (value == "REMOVE_CUP") {
+      cupPresent = false;
+      Serial.println("[BLE TEST] Cup removed!");
+      sendStatusUpdate();
+    } else if (value == "PLACE_CUP") {
+      cupPresent = true;
+      Serial.println("[BLE TEST] Cup placed!");
+      sendStatusUpdate();
+    } else if (value == "TRIGGER_ERROR") {
+      machineStatus = "ERROR";
+      Serial.println("[BLE TEST] Error state triggered!");
+      sendStatusUpdate();
+    } else if (value == "CLEAR_ERROR") {
+      machineStatus = "IDLE";
+      Serial.println("[BLE TEST] Error cleared!");
+      sendStatusUpdate();
+    }
   }
 };
 
 void sendStatusUpdate() {
-  StaticJsonDocument<200> doc;
+  StaticJsonDocument<256> doc;
   doc["status"] = machineStatus;
   doc["waterLevel"] = waterLevel;
   doc["beanLevel"] = beanLevel;
   doc["boilerTemp"] = boilerTemp;
+  doc["cupPresent"] = cupPresent;
+  doc["waterLevelWarning"] = waterLevelWarning;
 
   String json;
   serializeJson(doc, json);
