@@ -34,20 +34,28 @@ unsigned long actionStartTime = 0;
 const unsigned long GRIND_DURATION_MS = 4000;    // GRIND -> USER_PROMPT
 const unsigned long DISPENSE_DURATION_MS = 6000; // DISPENSE -> IDLE
 
+// IMPORTANT: BLE server/characteristic callbacks (onConnect/onDisconnect/
+// onWrite) run on the Bluetooth controller's own task (BTC_TASK), which has
+// a small fixed stack. Calling more BLE-stack operations (notify(),
+// startAdvertising()) directly from inside these callbacks stacks more
+// frames on top of an already-deep call chain and can overflow it - this is
+// exactly what crashed the board ("stack overflow in task BTC_TASK")
+// after a period of normal use. Fix: callbacks only set a flag; the actual
+// BLE-stack work happens in loop(), which runs on the main task with a much
+// larger stack.
+volatile bool statusUpdatePending = false;
+volatile bool advertisingRestartPending = false;
+
 void sendStatusUpdate(); // forward declaration so CommandCallbacks can call it
 
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *server) override {
     Serial.printf("[BLE] Client connected (%d total)\n", server->getConnectedCount());
-    // Keep advertising even while connected, so a second device (e.g. the
-    // web dashboard) can still find and connect while the phone stays
-    // connected too - this board supports multiple simultaneous BLE
-    // connections, it just wasn't advertising after the first one.
-    BLEDevice::startAdvertising();
+    advertisingRestartPending = true;
   }
   void onDisconnect(BLEServer *server) override {
     Serial.printf("[BLE] Client disconnected (%d remaining), resuming advertising\n", server->getConnectedCount());
-    BLEDevice::startAdvertising();
+    advertisingRestartPending = true;
   }
 };
 
@@ -57,20 +65,21 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
     Serial.print("[BLE] Command received: ");
     Serial.println(value);
 
+    // NOTE: never call sendStatusUpdate()/notify() directly in here - see
+    // the comment above statusUpdatePending. Every branch below just sets
+    // state and requests an update; loop() does the actual notify.
+
     if (value == "START_GRIND") {
       machineStatus = "GRIND";
       beanLevel = max(0, beanLevel - 5);
       actionStartTime = millis();
-      sendStatusUpdate(); // don't wait for the next periodic notify
     } else if (value == "START_DISPENSE") {
       machineStatus = "DISPENSE";
       waterLevel = max(0, waterLevel - 15);
       if (waterLevel < 15) waterLevelWarning = true;
       actionStartTime = millis();
-      sendStatusUpdate();
     } else if (value == "RESET") {
       machineStatus = "IDLE";
-      sendStatusUpdate();
     }
     // --- TESTING / SIMULATION COMMANDS (mirrors PO1_Hardware/main.cpp) ---
     else if (value == "REFILL") {
@@ -80,32 +89,25 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
       cupPresent = true;
       machineStatus = "IDLE";
       Serial.println("[BLE TEST] Refilled machine!");
-      sendStatusUpdate();
     } else if (value == "EMPTY_WATER") {
       waterLevel = 4;
       waterLevelWarning = true;
       Serial.println("[BLE TEST] Emptied water tank!");
-      sendStatusUpdate();
     } else if (value == "EMPTY_BEANS") {
       beanLevel = 2;
       Serial.println("[BLE TEST] Emptied bean hopper!");
-      sendStatusUpdate();
     } else if (value == "REMOVE_CUP") {
       cupPresent = false;
       Serial.println("[BLE TEST] Cup removed!");
-      sendStatusUpdate();
     } else if (value == "PLACE_CUP") {
       cupPresent = true;
       Serial.println("[BLE TEST] Cup placed!");
-      sendStatusUpdate();
     } else if (value == "TRIGGER_ERROR") {
       machineStatus = "ERROR";
       Serial.println("[BLE TEST] Error state triggered!");
-      sendStatusUpdate();
     } else if (value == "CLEAR_ERROR") {
       machineStatus = "IDLE";
       Serial.println("[BLE TEST] Error cleared!");
-      sendStatusUpdate();
     }
     // SET_WATER:<0-100> / SET_BEANS:<0-100> - set an exact level instead of
     // just empty/full, e.g. to test the low-supply warning threshold.
@@ -114,13 +116,15 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
       waterLevel = level;
       waterLevelWarning = level < 15;
       Serial.printf("[BLE TEST] Water level set to %d\n", level);
-      sendStatusUpdate();
     } else if (value.startsWith("SET_BEANS:")) {
       int level = constrain(value.substring(10).toInt(), 0, 100);
       beanLevel = level;
       Serial.printf("[BLE TEST] Bean level set to %d\n", level);
-      sendStatusUpdate();
+    } else {
+      return; // unrecognized command, nothing changed, don't notify
     }
+
+    statusUpdatePending = true;
   }
 };
 
@@ -175,6 +179,20 @@ void setup() {
 unsigned long lastNotify = 0;
 
 void loop() {
+  // Handle anything BLE callbacks deferred rather than doing directly -
+  // this runs on the main task (large stack), unlike the callbacks
+  // themselves (small BTC_TASK stack). See the comment above
+  // statusUpdatePending for why this matters.
+  if (advertisingRestartPending) {
+    BLEDevice::startAdvertising();
+    advertisingRestartPending = false;
+  }
+  if (statusUpdatePending) {
+    sendStatusUpdate();
+    statusUpdatePending = false;
+    lastNotify = millis();
+  }
+
   // Auto-advance the state machine, same idea as simulator/server.js's
   // setTimeout chains - this was missing entirely before, which is why
   // the app got stuck showing "Grinding..." forever.
@@ -182,10 +200,12 @@ void loop() {
     machineStatus = "USER_PROMPT";
     Serial.println("[BLE] Grinding finished, waiting for user to move cup");
     sendStatusUpdate();
+    lastNotify = millis();
   } else if (machineStatus == "DISPENSE" && millis() - actionStartTime > DISPENSE_DURATION_MS) {
     machineStatus = "IDLE";
     Serial.println("[BLE] Dispensing finished, back to IDLE");
     sendStatusUpdate();
+    lastNotify = millis();
   }
 
   if (pServer->getConnectedCount() > 0 && millis() - lastNotify > 2000) {
