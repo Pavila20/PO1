@@ -11,7 +11,10 @@
     "owner": "po1capstone",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.pavila20.PO1"
+      "bundleIdentifier": "com.pavila20.PO1",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "PourOver1 uses Bluetooth to connect to your coffee machine."
+      }
     },
     "android": {
       "adaptiveIcon": {

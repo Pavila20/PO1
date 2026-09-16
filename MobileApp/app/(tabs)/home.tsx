@@ -398,6 +398,23 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* TEMP: BLE test entry point, remove before merging to main */}
+          <TouchableOpacity
+            style={{
+              alignSelf: "flex-start",
+              paddingVertical: 6,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+              backgroundColor: "#333",
+              marginBottom: 8,
+            }}
+            onPress={() => router.push("/ble-test")}
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              BLE Test (dev)
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.widgetContainer,
