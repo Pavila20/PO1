@@ -64,6 +64,7 @@ export default function SetupSearch() {
           }}
           onPress={async () => {
             await AsyncStorage.setItem("is_setup_complete", "true");
+            await AsyncStorage.setItem("isMachinePaired", "true");
             router.replace("/(tabs)/home");
           }}
         >
