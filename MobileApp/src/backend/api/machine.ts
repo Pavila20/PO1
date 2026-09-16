@@ -7,7 +7,7 @@ const MACHINE_URL = process.env.EXPO_PUBLIC_MACHINE_IP;
 // calling the same two functions. Defaults to wifi so nothing changes
 // unless something explicitly opts into ble (see setConnectionType).
 export type ConnectionType = "wifi" | "ble";
-let connectionType: ConnectionType = "wifi";
+let connectionType: ConnectionType = "ble";
 
 export function setConnectionType(type: ConnectionType) {
   connectionType = type;
