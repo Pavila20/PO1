@@ -1,4 +1,21 @@
+import { getMachineStatusBle, sendMachineCommandBle } from "./machineBle";
+
 const MACHINE_URL = process.env.EXPO_PUBLIC_MACHINE_IP;
+
+// Which transport getMachineStatus/sendMachineCommand actually use.
+// Screens never need to know or care which one is active - they just keep
+// calling the same two functions. Defaults to wifi so nothing changes
+// unless something explicitly opts into ble (see setConnectionType).
+export type ConnectionType = "wifi" | "ble";
+let connectionType: ConnectionType = "wifi";
+
+export function setConnectionType(type: ConnectionType) {
+  connectionType = type;
+}
+
+export function getConnectionType() {
+  return connectionType;
+}
 
 // Helper function to fetch with a timeout
 async function fetchWithTimeout(resource: string, options: any = {}) {
@@ -15,7 +32,8 @@ async function fetchWithTimeout(resource: string, options: any = {}) {
 
   return response;
 }
-export async function getMachineStatus() {
+
+async function getMachineStatusWifi() {
   try {
     if (!MACHINE_URL) return null;
 
@@ -33,6 +51,11 @@ export async function getMachineStatus() {
     console.log(` Failed to connect to machine at ${MACHINE_URL}`);
     return null;
   }
+}
+
+export async function getMachineStatus() {
+  if (connectionType === "ble") return getMachineStatusBle();
+  return getMachineStatusWifi();
 }
 
 export async function sendBrewCommand(recipe: string, strength: string) {
@@ -56,7 +79,7 @@ export async function sendBrewCommand(recipe: string, strength: string) {
 }
 
 // Send specific step-by-step commands to the hardware
-export async function sendMachineCommand(command: string) {
+async function sendMachineCommandWifi(command: string) {
   try {
     if (!MACHINE_URL) return { success: false };
     const response = await fetch(`${MACHINE_URL}/command`, {
@@ -74,4 +97,9 @@ export async function sendMachineCommand(command: string) {
     console.error(` Failed to send command ${command}:`, error);
     return { success: false };
   }
+}
+
+export async function sendMachineCommand(command: string) {
+  if (connectionType === "ble") return sendMachineCommandBle(command);
+  return sendMachineCommandWifi(command);
 }

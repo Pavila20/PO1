@@ -13,7 +13,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pavila20.PO1",
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "PourOver1 uses Bluetooth to connect to your coffee machine."
+        "NSBluetoothAlwaysUsageDescription": "PourOver1 uses Bluetooth to connect to your coffee machine.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -25,7 +26,12 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.pavila20.PO1"
+      "package": "com.pavila20.PO1",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
     },
     "web": {
       "output": "static",
