@@ -1,20 +1,22 @@
 // app/(tabs)/home.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
-  Bean,
   Camera,
   ChevronRight,
   Coffee,
-  Droplet,
   LogOut,
   Moon,
+  Plus,
+  Sparkles,
   Sun,
   Thermometer,
   Trash2,
   X,
 } from "lucide-react-native";
+import { MotiView } from "moti";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -33,6 +35,17 @@ import {
 } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
+import {
+  Accent,
+  Glass,
+  Gradients,
+  Lilac,
+  Motion,
+  Orbs,
+  Pop,
+  Radii,
+  SoftShadow,
+} from "../../src/constants/DesignSystem";
 import { getMachineStatus } from "../../src/backend/api/machine";
 import { getSessionUser, signOutLocal } from "../../src/backend/auth/session";
 
@@ -54,6 +67,12 @@ export default function HomeScreen() {
   const router = useRouter();
   const { colors, mode, setMode, theme } = useTheme();
   const isDark = theme === "dark";
+  const g = isDark ? Gradients.dark : Gradients.light;
+  const glass = isDark ? Glass.dark : Glass.light;
+  const accent = isDark ? Accent.dark : Accent.light;
+  const pop = isDark ? Pop.dark : Pop.light;
+  const lilac = isDark ? Lilac.dark : Lilac.light;
+  const orbOpacity = isDark ? Orbs.dark.opacity : Orbs.light.opacity;
 
   const [firstName, setFirstName] = useState("There");
   const [greeting, setGreeting] = useState("Good Morning");
@@ -209,6 +228,11 @@ export default function HomeScreen() {
   };
 
   const isConnected = isPaired && !!machineData;
+  const isBrewing =
+    isConnected &&
+    ["GRIND", "USER_PROMPT", "PUMP", "HEAT", "DISPENSE"].includes(
+      machineData?.status,
+    );
 
   const statusText = !isPaired
     ? "Tap to connect machine"
@@ -219,7 +243,7 @@ export default function HomeScreen() {
         : machineData?.status === "USER_PROMPT"
           ? "Action Required"
           : machineData?.status === "ERROR"
-            ? "Error Check Machine"
+            ? "Error — check machine"
             : "Brewing...";
 
   const statusColor =
@@ -233,521 +257,657 @@ export default function HomeScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        edges={["top"]}
-      >
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <LinearGradient colors={g.screen} style={{ flex: 1 }}>
+        {/* Decorative glow orbs - drifting slowly to keep the background alive */}
+        <View style={styles.orbLayer} pointerEvents="none">
+          <MotiView
+            from={{ translateY: 0, scale: 1 }}
+            animate={{ translateY: 18, scale: 1.08 }}
+            transition={{
+              type: "timing",
+              duration: 7000,
+              loop: true,
+              repeatReverse: true,
+            }}
+            style={[
+              styles.orb,
+              {
+                backgroundColor: pop,
+                opacity: orbOpacity,
+                width: 260,
+                height: 260,
+                top: -70,
+                right: -60,
+              },
+            ]}
+          />
+          <MotiView
+            from={{ translateY: 0, scale: 1 }}
+            animate={{ translateY: -22, scale: 1.05 }}
+            transition={{
+              type: "timing",
+              duration: 9000,
+              loop: true,
+              repeatReverse: true,
+            }}
+            style={[
+              styles.orb,
+              {
+                backgroundColor: accent,
+                opacity: orbOpacity * 0.75,
+                width: 220,
+                height: 220,
+                top: 240,
+                left: -80,
+              },
+            ]}
+          />
+          <MotiView
+            from={{ translateX: 0 }}
+            animate={{ translateX: 16 }}
+            transition={{
+              type: "timing",
+              duration: 8000,
+              loop: true,
+              repeatReverse: true,
+            }}
+            style={[
+              styles.orb,
+              {
+                backgroundColor: lilac,
+                opacity: orbOpacity * 0.7,
+                width: 200,
+                height: 200,
+                top: 520,
+                right: -70,
+              },
+            ]}
+          />
+        </View>
 
-        <Modal
-          visible={isMenuVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setMenuVisible(false)}
-        >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setMenuVisible(false)}
+        <SafeAreaView style={styles.container} edges={["top"]}>
+          <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+
+          <Modal
+            visible={isMenuVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setMenuVisible(false)}
           >
             <TouchableOpacity
+              style={styles.modalOverlay}
               activeOpacity={1}
-              style={[styles.menuContent, { backgroundColor: colors.card }]}
+              onPress={() => setMenuVisible(false)}
             >
               <TouchableOpacity
-                style={styles.menuRow}
-                onPress={handleChangePicture}
+                activeOpacity={1}
+                style={[
+                  styles.menuContent,
+                  { backgroundColor: colors.card, borderRadius: Radii.md },
+                ]}
               >
-                <Camera color={colors.text} size={20} />
-                <Text style={[styles.menuText, { color: colors.text }]}>
-                  Change Picture
-                </Text>
-              </TouchableOpacity>
-
-              <View
-                style={[
-                  styles.menuDivider,
-                  { backgroundColor: isDark ? "#444" : "#E5E5E5" },
-                ]}
-              />
-
-              <View style={styles.menuThemeSection}>
-                <View style={[styles.menuRow, styles.themeRow]}>
-                  {theme === "dark" ? (
-                    <Moon color={colors.text} size={20} />
-                  ) : (
-                    <Sun color={colors.text} size={20} />
-                  )}
-                  <Text
-                    style={[styles.menuText, { color: colors.text, flex: 1 }]}
-                  >
-                    Dark Mode
+                <TouchableOpacity
+                  style={styles.menuRow}
+                  onPress={handleChangePicture}
+                >
+                  <Camera color={colors.text} size={20} />
+                  <Text style={[styles.menuText, { color: colors.text }]}>
+                    Change Picture
                   </Text>
-                  <Switch
-                    value={theme === "dark"}
-                    onValueChange={(val) => setMode(val ? "dark" : "light")}
-                    trackColor={{
-                      false: "#767577",
-                      true: colors.primaryButton,
-                    }}
-                  />
-                </View>
-              </View>
-              <View
-                style={[
-                  styles.menuDivider,
-                  { backgroundColor: isDark ? "#444" : "#E5E5E5" },
-                ]}
-              />
+                </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
-                <LogOut color="#e72020" size={20} />
-                <Text style={[styles.menuText, { color: "#e72020" }]}>
-                  Log Out
-                </Text>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: isDark ? "#444" : "#E5E5E5" },
+                  ]}
+                />
+
+                <View style={styles.menuThemeSection}>
+                  <View style={[styles.menuRow, styles.themeRow]}>
+                    {theme === "dark" ? (
+                      <Moon color={colors.text} size={20} />
+                    ) : (
+                      <Sun color={colors.text} size={20} />
+                    )}
+                    <Text
+                      style={[styles.menuText, { color: colors.text, flex: 1 }]}
+                    >
+                      Dark Mode
+                    </Text>
+                    <Switch
+                      value={theme === "dark"}
+                      onValueChange={(val) => setMode(val ? "dark" : "light")}
+                      trackColor={{ false: "#767577", true: accent }}
+                    />
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.menuDivider,
+                    { backgroundColor: isDark ? "#444" : "#E5E5E5" },
+                  ]}
+                />
+
+                <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
+                  <LogOut color="#e72020" size={20} />
+                  <Text style={[styles.menuText, { color: "#e72020" }]}>
+                    Log Out
+                  </Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
+          </Modal>
 
-        <Modal
-          visible={isPicModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setPicModalVisible(false)}
-        >
-          <View style={styles.picModalOverlay}>
-            <View
-              style={[
-                styles.picModalContent,
-                { backgroundColor: colors.background },
-              ]}
-            >
-              <View style={styles.picModalHeader}>
-                <Text style={[styles.picModalTitle, { color: colors.text }]}>
-                  Choose an Avatar
-                </Text>
-                <TouchableOpacity onPress={() => setPicModalVisible(false)}>
-                  <X color={colors.text} size={24} />
-                </TouchableOpacity>
+          <Modal
+            visible={isPicModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setPicModalVisible(false)}
+          >
+            <View style={styles.picModalOverlay}>
+              <View
+                style={[
+                  styles.picModalContent,
+                  { backgroundColor: colors.background, borderRadius: Radii.lg },
+                ]}
+              >
+                <View style={styles.picModalHeader}>
+                  <Text style={[styles.picModalTitle, { color: colors.text }]}>
+                    Choose an Avatar
+                  </Text>
+                  <TouchableOpacity onPress={() => setPicModalVisible(false)}>
+                    <X color={colors.text} size={24} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.picGrid}>
+                  {PROFILE_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.id}
+                      style={[
+                        styles.picOption,
+                        {
+                          backgroundColor: colors.card,
+                          borderColor:
+                            profilePic === option.src ? accent : "transparent",
+                        },
+                      ]}
+                      onPress={() => selectNewProfilePic(option)}
+                      activeOpacity={0.8}
+                    >
+                      <Image
+                        source={option.src}
+                        style={styles.picOptionImage}
+                        contentFit="contain"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-              <View style={styles.picGrid}>
-                {PROFILE_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    style={[
-                      styles.picOption,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor:
-                          profilePic === option.src
-                            ? colors.primaryButton
-                            : "transparent",
-                      },
-                    ]}
-                    onPress={() => selectNewProfilePic(option)}
-                    activeOpacity={0.8}
-                  >
+            </View>
+          </Modal>
+
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <MotiView
+              from={{ opacity: 0, translateY: -10 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={Motion.spring}
+              style={styles.header}
+            >
+              <View style={styles.greetingContainer}>
+                <View style={styles.greetingTextWrapper}>
+                  <View style={styles.greetingRow}>
+                    <Text style={[styles.greetingName, { color: colors.text }]}>
+                      Hi, {firstName} {emoji}
+                    </Text>
+                    <MotiView
+                      from={{ scale: 0.7, rotate: "-12deg" }}
+                      animate={{ scale: 1, rotate: "0deg" }}
+                      transition={{ ...Motion.spring, delay: 300 }}
+                    >
+                      <Sparkles size={18} color={pop} />
+                    </MotiView>
+                  </View>
+                  <Text style={[styles.greetingTime, { color: colors.text }]}>
+                    {greeting}
+                  </Text>
+                </View>
+                <Text style={[styles.subtitle, { color: colors.subtext }]}>
+                  What would you like to order today?
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.profileButton,
+                  {
+                    borderColor: pop,
+                    backgroundColor: glass.surface,
+                    ...SoftShadow,
+                  },
+                ]}
+                activeOpacity={0.8}
+                onPress={() => setMenuVisible(true)}
+              >
+                <Image
+                  source={profilePic}
+                  style={styles.profileImage}
+                  contentFit="cover"
+                />
+              </TouchableOpacity>
+            </MotiView>
+
+            {/* TEMP: BLE test entry point, kept as ongoing debug tooling */}
+            <TouchableOpacity
+              style={styles.bleDevButton}
+              onPress={() => router.push("/ble-test")}
+            >
+              <Text style={styles.bleDevButtonText}>BLE Test (dev)</Text>
+            </TouchableOpacity>
+
+            <MotiView
+              from={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ ...Motion.spring, delay: 80 }}
+            >
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => router.push(isPaired ? "/machine-info" : "/setup")}
+              >
+                <LinearGradient
+                  colors={g.hero}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.widgetContainer, SoftShadow]}
+                >
+                  <View style={styles.widgetHeader}>
+                    <Text style={styles.widgetTitle}>
+                      {isPaired ? "PourOver1" : "No Machine"}
+                    </Text>
+                    <ChevronRight size={22} color="rgba(255,255,255,0.85)" />
+                  </View>
+
+                  <View style={styles.machineContent}>
                     <Image
-                      source={option.src}
-                      style={styles.picOptionImage}
+                      source={require("../../assets/images/PO1.png")}
+                      style={styles.machineImage}
                       contentFit="contain"
                     />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-        </Modal>
 
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.header}>
-            <View style={styles.greetingContainer}>
-              <View style={styles.greetingTextWrapper}>
-                <Text style={[styles.greetingName, { color: colors.text }]}>
-                  Hi, {firstName} {emoji}
-                </Text>
-                <Text style={[styles.greetingTime, { color: colors.text }]}>
-                  {greeting}
-                </Text>
-              </View>
-              <Text style={[styles.subtitle, { color: colors.subtext }]}>
-                What would you like to order today?
-              </Text>
-            </View>
+                    <View style={{ flex: 1, gap: 10 }}>
+                      <MotiView
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: "rgba(255,255,255,0.18)" },
+                        ]}
+                        animate={
+                          isBrewing
+                            ? { opacity: [1, 0.6, 1] }
+                            : { opacity: 1 }
+                        }
+                        transition={
+                          isBrewing
+                            ? {
+                                type: "timing",
+                                duration: 1200,
+                                loop: true,
+                              }
+                            : undefined
+                        }
+                      >
+                        <View
+                          style={[styles.statusDot, { backgroundColor: statusColor }]}
+                        />
+                        <Text style={styles.statusText}>{statusText}</Text>
+                      </MotiView>
 
-            <TouchableOpacity
-              style={[
-                styles.profileButton,
-                {
-                  backgroundColor: colors.primaryButton,
-                  borderColor: colors.primaryButton,
-                },
-              ]}
-              activeOpacity={0.8}
-              onPress={() => setMenuVisible(true)}
-            >
-              <Image
-                source={profilePic}
-                style={styles.profileImage}
-                contentFit="cover"
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* TEMP: BLE test entry point, remove before merging to main */}
-          <TouchableOpacity
-            style={{
-              alignSelf: "flex-start",
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              borderRadius: 8,
-              backgroundColor: "#333",
-              marginBottom: 8,
-            }}
-            onPress={() => router.push("/ble-test")}
-          >
-            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
-              BLE Test (dev)
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.widgetContainer,
-              { backgroundColor: colors.widgetBackground },
-            ]}
-            onPress={() => router.push(isPaired ? "/machine-info" : "/setup")}
-            activeOpacity={0.9}
-          >
-            <View style={styles.widgetHeader}>
-              <View style={styles.widgetTitleContainer}>
-                <Text
-                  style={[styles.widgetTitle, { color: colors.widgetText }]}
-                >
-                  {isPaired ? "PourOver1" : "No Machine"}
-                </Text>
-                <View
-                  style={[styles.statusBadge, { backgroundColor: statusColor }]}
-                >
-                  <Text style={styles.statusText}>{statusText}</Text>
-                </View>
-              </View>
-              <ChevronRight size={24} color={colors.widgetText} />
-            </View>
-
-            <View
-              style={[
-                styles.machineContent,
-                { backgroundColor: isDark ? "#A9612F" : "#C27A45" },
-              ]}
-            >
-              <View style={styles.machineImageWrapper}>
-                <Image
-                  source={require("../../assets/images/PO1.png")}
-                  style={styles.machineImage}
-                  contentFit="contain"
-                />
-              </View>
-
-              <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                  <View
-                    style={[
-                      styles.statCircle,
-                      machineData?.waterLevelWarning
-                        ? styles.statCritical
-                        : { backgroundColor: "rgba(255,255,255,0.2)" },
-                    ]}
-                  >
-                    <Droplet
-                      size={14}
-                      color={
-                        machineData?.waterLevelWarning ? "#e72020" : "#000"
-                      }
-                    />
+                      {isConnected && (
+                        <View style={styles.tempChip}>
+                          <Thermometer size={14} color="rgba(255,255,255,0.9)" />
+                          <Text style={styles.tempChipText}>
+                            {machineData?.boilerTemp ?? "--"}°
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                  <Text style={styles.statLabel}>
-                    {machineData?.waterLevel ?? "--"}%
-                  </Text>
-                </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </MotiView>
 
-                <View style={styles.statItem}>
-                  <View
-                    style={[
-                      styles.statCircle,
-                      { backgroundColor: "rgba(255,255,255,0.2)" },
-                    ]}
-                  >
-                    <Bean size={14} color="#000" />
-                  </View>
-                  <Text style={styles.statLabel}>
-                    {machineData?.beanLevel ?? "--"}%
-                  </Text>
-                </View>
-
-                <View style={styles.statItem}>
-                  <View
-                    style={[
-                      styles.statCircle,
-                      { backgroundColor: "rgba(255,255,255,0.2)" },
-                    ]}
-                  >
-                    <Thermometer size={14} color="#000" />
-                  </View>
-                  <Text style={styles.statLabel}>
-                    {machineData?.boilerTemp ?? "--"}°F
-                  </Text>
-                </View>
-
-                <View style={styles.statItem}>
-                  <View
-                    style={[
-                      styles.statCircle,
-                      { backgroundColor: "rgba(255,255,255,0.2)" },
-                    ]}
-                  >
-                    <Coffee size={14} color="#000" />
-                  </View>
-                  <Text style={styles.statLabel}>
-                    {machineData?.status
-                      ? machineData.status.charAt(0).toUpperCase() +
-                        machineData.status.slice(1)
-                      : "--"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.sectionContainer}>
-            <View style={styles.recipeHeader}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: colors.widgetBackground },
-                ]}
+            {isPaired && savedRecipes.length > 0 && (
+              <MotiView
+                from={{ opacity: 0, translateY: 12 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ ...Motion.spring, delay: 140 }}
               >
-                Your Smart Coffee
-              </Text>
-            </View>
-
-            <View style={styles.recipeList}>
-              {savedRecipes.length === 0 ? (
                 <TouchableOpacity
-                  style={[
-                    styles.primaryBtn,
-                    {
-                      backgroundColor: colors.card,
-                      marginTop: 10,
-                      flexDirection: "column",
-                      paddingVertical: 32,
-                    },
-                  ]}
-                  onPress={() => router.push("/create-recipe")}
-                  activeOpacity={0.8}
+                  activeOpacity={0.9}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/coffee-details",
+                      params: {
+                        name: savedRecipes[0].name,
+                        strength: "Custom",
+                        isCustom: "true",
+                        recipeId: savedRecipes[0].profileId,
+                      },
+                    })
+                  }
                 >
-                  <Image
-                    source={require("../../assets/images/MorningCoffeeIcon.png")}
-                    style={{ width: 64, height: 64, marginBottom: 12 }}
-                    contentFit="contain"
-                  />
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontSize: 16,
-                      fontWeight: "bold",
-                    }}
+                  <LinearGradient
+                    colors={[pop, accent]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.brewCta, SoftShadow]}
                   >
-                    Get started in home
-                  </Text>
+                    <Coffee size={20} color="#fff" />
+                    <Text style={styles.brewCtaText}>
+                      Brew {savedRecipes[0].name}
+                    </Text>
+                  </LinearGradient>
                 </TouchableOpacity>
-              ) : (
-                savedRecipes.map((recipe) => (
-                  <Swipeable
-                    key={recipe.profileId}
-                    renderRightActions={() =>
-                      renderRightActions(recipe.profileId)
-                    }
-                    containerStyle={{ overflow: "visible" }}
+              </MotiView>
+            )}
+
+            <View style={styles.sectionContainer}>
+              <View style={styles.recipeHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Your Smart Coffee
+                </Text>
+                <View style={styles.headerActions}>
+                  {savedRecipes.length > 0 && coffeePref !== "--" && (
+                    <View
+                      style={[
+                        styles.tasteChip,
+                        { backgroundColor: glass.surface, borderColor: pop },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.tasteChipText, { color: colors.text }]}
+                      >
+                        Taste {coffeePref}
+                      </Text>
+                    </View>
+                  )}
+                  {savedRecipes.length > 0 && (
+                    <TouchableOpacity
+                      style={[styles.addButton, { backgroundColor: accent }]}
+                      onPress={() => router.push("/create-recipe")}
+                    >
+                      <Plus size={16} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.recipeList}>
+                {savedRecipes.length === 0 ? (
+                  <MotiView
+                    from={{ opacity: 0, translateY: 12 }}
+                    animate={{ opacity: 1, translateY: 0 }}
+                    transition={{ ...Motion.spring, delay: 150 }}
                   >
                     <TouchableOpacity
                       style={[
-                        styles.recipeCard,
-                        { backgroundColor: colors.card },
+                        styles.primaryBtn,
+                        {
+                          backgroundColor: glass.surface,
+                          borderColor: glass.border,
+                          borderWidth: 1,
+                          ...SoftShadow,
+                        },
                       ]}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/coffee-details",
-                          params: {
-                            name: recipe.name,
-                            strength: "Custom",
-                            isCustom: "true",
-                            recipeId: recipe.profileId,
-                          },
-                        })
-                      }
+                      onPress={() => router.push("/create-recipe")}
+                      activeOpacity={0.8}
                     >
-                      <View style={styles.recipeRow}>
-                        <Image
-                          source={require("../../assets/images/MorningCoffeeIcon.png")}
-                          style={styles.recipeImage}
-                          contentFit="contain"
-                        />
-                        <View style={styles.recipeInfo}>
-                          <Text
-                            style={[
-                              styles.recipeTitle,
-                              { color: colors.cardHeader },
-                            ]}
-                          >
-                            {recipe.name}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.recipeSubtitle,
-                              { color: colors.cardSubtext },
-                            ]}
-                          >
-                            Temp: {recipe.targetTemp}°F • Grind:{" "}
-                            {recipe.grindSize} • Beans:{" "}
-                            {recipe.coffeeWeight || 20}g
-                          </Text>
-                        </View>
-                        <ChevronRight size={20} color={colors.cardHeader} />
-                      </View>
+                      <Image
+                        source={require("../../assets/images/MorningCoffeeIcon.png")}
+                        style={{ width: 72, height: 72, marginBottom: 14 }}
+                        contentFit="contain"
+                      />
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontSize: 17,
+                          fontWeight: "800",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Make your first cup
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.subtext,
+                          fontSize: 13,
+                          textAlign: "center",
+                        }}
+                      >
+                        Set your taste, and it learns what you like
+                      </Text>
                     </TouchableOpacity>
-                  </Swipeable>
-                ))
-              )}
+                  </MotiView>
+                ) : (
+                  savedRecipes.map((recipe, index) => (
+                    <MotiView
+                      key={recipe.profileId}
+                      from={{ opacity: 0, translateY: 16 }}
+                      animate={{ opacity: 1, translateY: 0 }}
+                      transition={{
+                        ...Motion.spring,
+                        delay: 180 + index * 70,
+                      }}
+                    >
+                      <Swipeable
+                        renderRightActions={() =>
+                          renderRightActions(recipe.profileId)
+                        }
+                        containerStyle={{ overflow: "visible" }}
+                      >
+                        <TouchableOpacity
+                          style={[
+                            styles.recipeCard,
+                            {
+                              backgroundColor: glass.surface,
+                              borderColor: glass.border,
+                              ...SoftShadow,
+                            },
+                          ]}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/coffee-details",
+                              params: {
+                                name: recipe.name,
+                                strength: "Custom",
+                                isCustom: "true",
+                                recipeId: recipe.profileId,
+                              },
+                            })
+                          }
+                        >
+                          <View style={styles.recipeRow}>
+                            <Image
+                              source={require("../../assets/images/MorningCoffeeIcon.png")}
+                              style={styles.recipeImage}
+                              contentFit="contain"
+                            />
+                            <View style={styles.recipeInfo}>
+                              <Text
+                                style={[
+                                  styles.recipeTitle,
+                                  { color: colors.text },
+                                ]}
+                              >
+                                {recipe.name}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.recipeSubtitle,
+                                  { color: colors.subtext },
+                                ]}
+                              >
+                                Temp: {recipe.targetTemp}°F • Grind:{" "}
+                                {recipe.grindSize} • Beans:{" "}
+                                {recipe.coffeeWeight || 20}g
+                              </Text>
+                            </View>
+                            <ChevronRight size={20} color={colors.text} />
+                          </View>
+                        </TouchableOpacity>
+                      </Swipeable>
+                    </MotiView>
+                  ))
+                )}
+              </View>
             </View>
-          </View>
 
-          {/* --- RECENT HISTORY SECTION --- */}
-          <View style={[styles.sectionContainer, { marginTop: 16 }]}>
-            <View style={styles.recipeHeader}>
-              <Text
+            {/* --- RECENT HISTORY SECTION --- */}
+            <View style={[styles.sectionContainer, { marginTop: 16 }]}>
+              <View style={styles.recipeHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Recent Brew History
+                </Text>
+              </View>
+
+              <View
                 style={[
-                  styles.sectionTitle,
-                  { color: colors.widgetBackground },
+                  styles.historyCard,
+                  {
+                    backgroundColor: glass.surface,
+                    borderColor: glass.border,
+                    ...SoftShadow,
+                  },
                 ]}
               >
-                Recent Brew History
-              </Text>
-            </View>
+                {recentHistory.length === 0 ? (
+                  <Text
+                    style={{
+                      color: colors.subtext,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    No recent brews yet.
+                  </Text>
+                ) : (
+                  recentHistory.map((brew, index) => {
+                    const profile = savedRecipes.find(
+                      (r) => r.profileId === brew.profileId,
+                    );
+                    const brewName = profile ? profile.name : "Custom Brew";
 
-            <View style={styles.historyList}>
-              {recentHistory.length === 0 ? (
-                <Text
-                  style={{
-                    color: colors.subtext,
-                    marginTop: 8,
-                    paddingHorizontal: 4,
-                  }}
-                >
-                  No recent brews yet.
-                </Text>
-              ) : (
-                recentHistory.map((brew, index) => {
-                  const profile = savedRecipes.find(
-                    (r) => r.profileId === brew.profileId,
-                  );
-                  const brewName = profile ? profile.name : "Custom Brew";
+                    const paramsText = profile
+                      ? `${profile.targetTemp}°F • ${profile.coffeeWeight || 20}g • ${profile.waterVolume}ml`
+                      : "Custom Parameters";
 
-                  // Simplified params for a cleaner look
-                  const paramsText = profile
-                    ? `${profile.targetTemp}°F • ${profile.coffeeWeight || 20}g • ${profile.waterVolume}ml`
-                    : "Custom Parameters";
+                    const dateStr = new Date(
+                      brew.timestamp,
+                    ).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    });
+                    const timeStr = new Date(
+                      brew.timestamp,
+                    ).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
 
-                  // Formatted date to look cleaner (e.g., "Oct 24")
-                  const dateStr = new Date(brew.timestamp).toLocaleDateString(
-                    undefined,
-                    { month: "short", day: "numeric" },
-                  );
-                  const timeStr = new Date(brew.timestamp).toLocaleTimeString(
-                    [],
-                    { hour: "2-digit", minute: "2-digit" },
-                  );
-
-                  return (
-                    <View
-                      key={brew.ratingId || index}
-                      style={[
-                        styles.historyItem,
-                        { borderBottomColor: isDark ? "#333" : "#E5E5E5" },
-                      ]}
-                    >
-                      {/* Minimal timeline dot instead of a big image */}
-                      <View
+                    return (
+                      <MotiView
+                        key={brew.ratingId || index}
+                        from={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{
+                          type: "timing",
+                          duration: 300,
+                          delay: 200 + index * 50,
+                        }}
                         style={[
-                          styles.historyDot,
-                          { backgroundColor: colors.primaryButton },
+                          styles.historyItem,
+                          index === 0 && { borderTopWidth: 0 },
+                          { borderTopColor: glass.border },
                         ]}
-                      />
+                      >
+                        <View
+                          style={[styles.historyDot, { backgroundColor: accent }]}
+                        />
 
-                      <View style={styles.historyContent}>
-                        <View style={styles.historyRowTitle}>
+                        <View style={styles.historyContent}>
+                          <View style={styles.historyRowTitle}>
+                            <Text
+                              style={[
+                                styles.historyTitle,
+                                { color: colors.text },
+                              ]}
+                            >
+                              {brewName}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.historyRating,
+                                { color: pop },
+                              ]}
+                            >
+                              {brew.rating}/15
+                            </Text>
+                          </View>
+
                           <Text
                             style={[
-                              styles.historyTitle,
-                              { color: colors.text },
+                              styles.historyParams,
+                              { color: colors.subtext },
                             ]}
                           >
-                            {brewName}
+                            {paramsText} • {brew.perceivedStrength}
                           </Text>
+
                           <Text
                             style={[
-                              styles.historyRating,
-                              { color: colors.text },
+                              styles.historyTime,
+                              { color: colors.subtext },
                             ]}
                           >
-                            {brew.rating}/15
+                            {dateStr} at {timeStr}
                           </Text>
                         </View>
-
-                        <Text
-                          style={[
-                            styles.historyParams,
-                            { color: colors.subtext },
-                          ]}
-                        >
-                          {paramsText} • {brew.perceivedStrength}
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.historyTime,
-                            { color: colors.subtext },
-                          ]}
-                        >
-                          {dateStr} at {timeStr}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })
-              )}
+                      </MotiView>
+                    );
+                  })
+                )}
+              </View>
             </View>
-          </View>
-        </ScrollView>
-
-        <View style={styles.bottomDecoration} pointerEvents="none">
-          <Image
-            source={require("../../assets/images/Group 1547.svg")}
-            style={styles.decorationImage}
-            contentFit="contain"
-          />
-        </View>
-      </SafeAreaView>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  orbLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  orb: { position: "absolute", borderRadius: 9999 },
+  greetingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  tasteChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+  },
+  tasteChipText: { fontSize: 11, fontWeight: "700" },
+  brewCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 18,
+    borderRadius: Radii.pill,
+  },
+  brewCtaText: { color: "#fff", fontSize: 17, fontWeight: "800" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -758,7 +918,6 @@ const styles = StyleSheet.create({
     marginTop: 80,
     marginRight: 21,
     width: 250,
-    borderRadius: 16,
     paddingVertical: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -779,21 +938,24 @@ const styles = StyleSheet.create({
   themeRow: {
     paddingVertical: 10,
   },
-  historyList: {
-    gap: 0, // Removes gap because we are using borders now
+  historyCard: {
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    padding: 16,
+    gap: 0,
   },
   historyItem: {
     flexDirection: "row",
     alignItems: "flex-start",
     paddingVertical: 14,
-    borderBottomWidth: 1,
+    borderTopWidth: 1,
     gap: 12,
   },
   historyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 6, // Aligns perfectly with the first line of text
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
   },
   historyContent: {
     flex: 1,
@@ -830,7 +992,6 @@ const styles = StyleSheet.create({
   },
   picModalContent: {
     width: "85%",
-    borderRadius: 24,
     padding: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -870,83 +1031,72 @@ const styles = StyleSheet.create({
   },
   greetingContainer: { flex: 1, gap: 5 },
   greetingTextWrapper: { marginBottom: 5 },
-  greetingName: { fontSize: 28, fontWeight: "800" },
-  greetingTime: { fontSize: 28, fontWeight: "800", opacity: 0.9 },
+  greetingName: { fontSize: 30, fontWeight: "800" },
+  greetingTime: { fontSize: 30, fontWeight: "800", opacity: 0.9 },
   subtitle: { fontSize: 14, fontWeight: "500" },
   profileButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     overflow: "hidden",
   },
   profileImage: { width: "100%", height: "100%" },
-  widgetContainer: { borderRadius: 15, padding: 12, gap: 12 },
+  widgetContainer: { borderRadius: Radii.lg, padding: 20, gap: 16 },
   widgetHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  widgetTitleContainer: { flexDirection: "row", alignItems: "center", gap: 8 },
-  widgetTitle: { fontSize: 16, fontWeight: "700" },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  statusText: { color: "#fff", fontSize: 10, fontWeight: "600" },
+  widgetTitle: { fontSize: 18, fontWeight: "800", color: "#fff" },
   machineContent: {
-    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  machineImage: { width: 90, height: 108 },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radii.pill,
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  tempChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+  },
+  tempChipText: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "600" },
+  sectionContainer: { gap: 12 },
+  sectionTitle: { fontSize: 21, fontWeight: "700" },
+  recipeHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
-    height: 120,
+    gap: 10,
   },
-  machineImageWrapper: {
-    flex: 1,
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  machineImage: { width: 100, height: 120 },
-  statsContainer: {
-    width: 160,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    justifyContent: "center",
-  },
-  statItem: { alignItems: "center", justifyContent: "center", width: 35 },
-  statCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  statCritical: {
-    borderWidth: 1,
-    borderColor: "#e72020",
-    backgroundColor: "#fff",
-  },
-  statLabel: { fontSize: 10, fontWeight: "600", marginTop: 4, color: "#fff" },
-  sectionContainer: { gap: 12 },
-  sectionTitle: { fontSize: 20, fontWeight: "600" },
-  recipeHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  plusButton: {
-    backgroundColor: "grey",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  addButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },
   recipeList: { gap: 10 },
-  recipeCard: { borderRadius: 15, padding: 16 },
+  recipeCard: { borderRadius: Radii.md, padding: 16, borderWidth: 1 },
   recipeRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   recipeImage: {
     width: 55,
     height: 55,
-    borderRadius: 15,
+    borderRadius: Radii.sm,
     backgroundColor: "#d19a6a",
   },
   recipeInfo: { flex: 1, gap: 2 },
@@ -957,22 +1107,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     width: 80,
-    borderRadius: 15,
+    borderRadius: Radii.md,
   },
   primaryBtn: {
     width: "100%",
-    paddingVertical: 16,
-    borderRadius: 16,
+    paddingVertical: 32,
+    borderRadius: Radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  bottomDecoration: {
-    alignItems: "flex-end",
-    position: "absolute",
-    bottom: -50,
-    right: 2,
-    zIndex: -1,
-    opacity: 0.5,
+  bleDevButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#333",
+    marginTop: -12,
   },
-  decorationImage: { width: 90, height: 250 },
+  bleDevButtonText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 });
