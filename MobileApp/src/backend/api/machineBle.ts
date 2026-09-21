@@ -32,13 +32,59 @@ export function isBleConnected() {
   return connectedDevice !== null;
 }
 
-export async function connectToMachineBle(): Promise<boolean> {
-  if (connectedDevice) return true;
+// A freshly created BleManager reports "Unknown" for a moment while iOS
+// initializes CoreBluetooth; scanning in that window fails with error 103.
+// Wait for PoweredOn (or give up if Bluetooth is off/unauthorized).
+function waitForPoweredOn(bleManager: BleManager): Promise<boolean> {
+  return new Promise((resolve) => {
+    const giveUp = setTimeout(() => {
+      sub.remove();
+      resolve(false);
+    }, 5000);
+    const sub = bleManager.onStateChange((state) => {
+      if (state === "PoweredOn") {
+        clearTimeout(giveUp);
+        sub.remove();
+        resolve(true);
+      } else if (state === "Unauthorized") {
+        console.warn("[BLE] Bluetooth state:", state);
+        clearTimeout(giveUp);
+        sub.remove();
+        resolve(false);
+      } else {
+        // Unknown / Resetting / PoweredOff can all be transient at startup;
+        // keep waiting until the timeout above.
+        console.log("[BLE] Bluetooth state:", state);
+      }
+    }, true);
+  });
+}
 
+// Only one scan/connect attempt may run at a time. Screens poll status every
+// couple of seconds; without this each poll started its own scan and they
+// cancelled each other, so a dropped machine never got reconnected.
+let connectInFlight: Promise<boolean> | null = null;
+let userDisconnected = false;
+
+export function connectToMachineBle(): Promise<boolean> {
+  if (connectedDevice) return Promise.resolve(true);
+  if (!connectInFlight) {
+    userDisconnected = false;
+    connectInFlight = doConnect().finally(() => {
+      connectInFlight = null;
+    });
+  }
+  return connectInFlight;
+}
+
+async function doConnect(): Promise<boolean> {
   const bleManager = getManager();
+
+  if (!(await waitForPoweredOn(bleManager))) return false;
 
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
+      console.warn("[BLE] scan timed out, no device found");
       bleManager.stopDeviceScan();
       resolve(false);
     }, SCAN_TIMEOUT_MS);
@@ -48,13 +94,18 @@ export async function connectToMachineBle(): Promise<boolean> {
       null,
       async (error, device) => {
         if (error) {
+          console.warn("[BLE] scan error:", error.message, error.errorCode);
           clearTimeout(timeout);
           bleManager.stopDeviceScan();
           resolve(false);
           return;
         }
 
-        if (device && device.name === DEVICE_NAME) {
+        if (
+          device &&
+          (device.name === DEVICE_NAME || device.localName === DEVICE_NAME)
+        ) {
+          console.log("[BLE] found", device.id, device.name, device.localName);
           clearTimeout(timeout);
           bleManager.stopDeviceScan();
 
@@ -104,10 +155,18 @@ export async function connectToMachineBle(): Promise<boolean> {
             connected.onDisconnected(() => {
               connectedDevice = null;
               latestStatus = null;
+              // Machine was unplugged / went out of range: start looking for
+              // it again right away so it re-pairs as soon as it's back.
+              if (!userDisconnected) {
+                setTimeout(() => {
+                  connectToMachineBle();
+                }, 500);
+              }
             });
 
             resolve(true);
-          } catch {
+          } catch (e: any) {
+            console.warn("[BLE] connect failed:", e?.message, e?.errorCode);
             resolve(false);
           }
         }
@@ -144,6 +203,7 @@ export async function sendMachineCommandBle(command: string) {
 }
 
 export function disconnectMachineBle() {
+  userDisconnected = true;
   connectedDevice?.cancelConnection().catch(() => {});
   connectedDevice = null;
   latestStatus = null;
