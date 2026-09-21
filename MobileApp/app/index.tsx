@@ -3,22 +3,44 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { MotiView } from "moti";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Image,
-  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../context/ThemeContext";
 import { signInWithGoogle } from "../src/backend/auth/cognitoGoogle";
 import { isLoggedIn } from "../src/backend/auth/session";
+import BeanBackground from "../src/components/BeanBackground";
+import HeartCupIcon from "../src/components/HeartCupIcon";
+import {
+  Accent,
+  Glass,
+  Gradients,
+  Latte,
+  Motion,
+  Orbs,
+  Pop,
+  Radii,
+  SoftShadow,
+} from "../src/constants/DesignSystem";
 
 export default function Welcome() {
   const router = useRouter();
+  const { colors, theme } = useTheme();
+  const isDark = theme === "dark";
+  const g = isDark ? Gradients.dark : Gradients.light;
+  const glass = isDark ? Glass.dark : Glass.light;
+  const pop = isDark ? Pop.dark : Pop.light;
+  const accent = isDark ? Accent.dark : Accent.light;
+  const latte = isDark ? Latte.dark : Latte.light;
+  const beanOpacity = isDark ? Orbs.dark.opacity : Orbs.light.opacity;
   const [isChecking, setIsChecking] = useState(true);
 
   // --- Auto Login Check ---
@@ -60,150 +82,196 @@ export default function Welcome() {
     }
   };
 
-  // Show a blank screen while checking the session to prevent flashing the login screen
+  // Same gradient while checking the session, so there is no flash of a
+  // different screen before auto-login redirects
   if (isChecking) {
-    return <View style={styles.container} />;
+    return <LinearGradient colors={g.screen} style={{ flex: 1 }} />;
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.imageSection}>
-        <LinearGradient
-          colors={[
-            "rgba(249, 233, 207, 1)",
-            "rgba(234, 201, 149, 1)",
-            "rgba(196, 131, 65, 1)",
-          ]}
-          locations={[0, 0.38, 0.75]}
-          style={styles.gradient}
-        >
-          <Image
-            source={require("../assets/images/SignIn-Image.png")}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        </LinearGradient>
-      </View>
+    <LinearGradient colors={g.screen} style={{ flex: 1 }}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <BeanBackground colors={[pop, latte, accent]} opacity={beanOpacity} />
 
-      <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
-        <ScrollView contentContainerStyle={styles.contentContainer}>
-          <View style={styles.textWrapper}>
-            <Text style={styles.title}>Welcome</Text>
-            <Text style={styles.subtitle}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.heroArea}>
+          {/* Soft halo behind the cup */}
+          <MotiView
+            from={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ ...Motion.springSoft, delay: 100 }}
+            style={styles.haloWrap}
+          >
+            <LinearGradient
+              colors={g.heroSoft}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.halo, SoftShadow]}
+            />
+          </MotiView>
+
+          {/* Cup pops in, then bobs gently forever */}
+          <MotiView
+            from={{ opacity: 0, scale: 0.5, translateY: 30 }}
+            animate={{ opacity: 1, scale: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 250 }}
+          >
+            <MotiView
+              from={{ translateY: 0, rotate: "-3deg" }}
+              animate={{ translateY: -10, rotate: "3deg" }}
+              transition={{
+                type: "timing",
+                duration: 2600,
+                loop: true,
+                repeatReverse: true,
+              }}
+            >
+              <HeartCupIcon width={200} />
+            </MotiView>
+          </MotiView>
+        </View>
+
+        <View style={styles.bottom}>
+          <MotiView
+            from={{ opacity: 0, translateY: 16 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 450 }}
+            style={styles.textWrapper}
+          >
+            <Text style={[styles.brand, { color: pop }]}>PourOver1</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Welcome</Text>
+            <Text style={[styles.subtitle, { color: colors.subtext }]}>
               Unlock the power of automation in your daily coffee routine.
             </Text>
-          </View>
+          </MotiView>
 
-          <View style={styles.buttonsWrapper}>
+          <MotiView
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 600 }}
+            style={styles.buttonsWrapper}
+          >
             <TouchableOpacity
-              style={styles.primaryButton}
+              activeOpacity={0.85}
               onPress={() => router.push("/auth/login")}
-              activeOpacity={0.8}
+              style={styles.fullWidth}
             >
-              <Text style={styles.primaryButtonText}>Sign in</Text>
+              <LinearGradient
+                colors={[pop, accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.primaryButton, SoftShadow]}
+              >
+                <Text style={styles.primaryButtonText}>Sign in</Text>
+              </LinearGradient>
             </TouchableOpacity>
 
-            <Text style={styles.orText}>Or login with</Text>
+            <View style={styles.orRow}>
+              <View style={[styles.orLine, { backgroundColor: glass.border }]} />
+              <Text style={[styles.orText, { color: colors.subtext }]}>
+                or continue with
+              </Text>
+              <View style={[styles.orLine, { backgroundColor: glass.border }]} />
+            </View>
 
             <TouchableOpacity
-              style={styles.googleButton}
-              activeOpacity={0.8}
+              style={[
+                styles.googleButton,
+                {
+                  backgroundColor: glass.surface,
+                  borderColor: glass.border,
+                  ...SoftShadow,
+                },
+              ]}
+              activeOpacity={0.85}
               onPress={handleGoogleSignIn}
             >
               <View style={styles.googleIconCircle}>
                 <Text style={styles.googleIconText}>G</Text>
               </View>
-              <Text style={styles.primaryButtonText}>Continue with Google</Text>
+              <Text style={[styles.googleButtonText, { color: colors.text }]}>
+                Google
+              </Text>
             </TouchableOpacity>
 
-            <View style={styles.divider} />
-
-            <Text style={styles.footerText}>
+            <Text style={[styles.footerText, { color: colors.subtext }]}>
               By using this app, you agree to our{" "}
               <Text style={styles.linkText}>Privacy policy</Text> and{" "}
               <Text style={styles.linkText}>Terms of use</Text>
             </Text>
-          </View>
-        </ScrollView>
+          </MotiView>
+        </View>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  imageSection: { height: "55%", width: "100%", position: "absolute", top: 0 },
-  gradient: { flex: 1, justifyContent: "center", alignItems: "center" },
-  image: { width: "100%", height: "100%", opacity: 0.8 },
-  safeArea: { flex: 1, justifyContent: "flex-end" },
-  contentContainer: {
-    flexGrow: 1,
-    justifyContent: "flex-end",
-    paddingBottom: 20,
-    backgroundColor: "transparent",
-  },
-  textWrapper: {
-    alignItems: "center",
-    paddingHorizontal: 34,
-    marginBottom: 29,
+  safeArea: { flex: 1 },
+  heroArea: { flex: 1, alignItems: "center", justifyContent: "center" },
+  haloWrap: { position: "absolute" },
+  halo: { width: 270, height: 270, borderRadius: 135, opacity: 0.85 },
+  bottom: { paddingHorizontal: 30, paddingBottom: 18 },
+  textWrapper: { alignItems: "center", marginBottom: 26 },
+  brand: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    marginBottom: 6,
   },
   title: {
     fontFamily: "serif",
-    fontSize: 25,
+    fontSize: 34,
     fontWeight: "700",
-    color: "#0F0F0F",
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#7E7E7E",
     textAlign: "center",
-    lineHeight: 22,
-    maxWidth: 300,
+    lineHeight: 23,
+    maxWidth: 310,
   },
-  buttonsWrapper: { paddingHorizontal: 34, alignItems: "center", gap: 16 },
+  buttonsWrapper: { alignItems: "center", gap: 14 },
+  fullWidth: { width: "100%" },
   primaryButton: {
     width: "100%",
-    height: 52,
-    borderRadius: 45,
-    backgroundColor: "#0F0F0F",
+    height: 56,
+    borderRadius: Radii.pill,
     justifyContent: "center",
     alignItems: "center",
   },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
-  orText: { fontSize: 12, color: "#6C7278", marginVertical: 4 },
+  primaryButtonText: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  orRow: { flexDirection: "row", alignItems: "center", gap: 12, width: "100%" },
+  orLine: { flex: 1, height: 1 },
+  orText: { fontSize: 12 },
   googleButton: {
     width: "100%",
-    height: 52,
-    borderRadius: 45,
-    backgroundColor: "#C5281B",
+    height: 56,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    gap: 10,
   },
   googleIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "white",
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
   },
-  googleIconText: { color: "#C5281B", fontWeight: "bold", fontSize: 16 },
-  divider: {
-    height: 1,
-    width: "100%",
-    backgroundColor: "#E0E3EF",
-    marginVertical: 10,
-  },
+  googleIconText: { color: "#DB4437", fontWeight: "800", fontSize: 16 },
+  googleButtonText: { fontSize: 16, fontWeight: "700" },
   footerText: {
     fontSize: 12,
-    color: "#7E7E7E",
     textAlign: "center",
     lineHeight: 18,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    marginTop: 4,
   },
-  linkText: { textDecorationLine: "underline", color: "#7E7E7E" },
+  linkText: { textDecorationLine: "underline" },
 });

@@ -1,17 +1,11 @@
 // app/qa-rating.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { ArrowLeft } from "lucide-react-native";
+import { MotiView } from "moti";
 import { useState } from "react";
-import {
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
 import {
@@ -22,23 +16,33 @@ import {
 import { getSessionUser } from "../src/backend/auth/session";
 import { calculateNewProfile } from "../src/backend/core/algorithm";
 import { PourProfile } from "../src/models/types";
+import { GradientButton } from "../src/components/auth/AuthControls";
+import BeanConfetti from "../src/components/BeanConfetti";
+import HeartCupIcon from "../src/components/HeartCupIcon";
+import ScreenShell from "../src/components/ScreenShell";
+import {
+  Accent,
+  Glass,
+  Motion,
+  Pop,
+  Radii,
+  SoftShadow,
+} from "../src/constants/DesignSystem";
 
 export default function QARatingScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const isDark = theme === "dark";
+  const glass = isDark ? Glass.dark : Glass.light;
+  const pop = isDark ? Pop.dark : Pop.light;
+  const accent = isDark ? Accent.dark : Accent.light;
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [score, setScore] = useState(12); // Enjoyment rating (1-15)
+  const [score, setScore] = useState(16); // Enjoyment rating (1-20)
   const [strength, setStrength] = useState("Perfect");
   const [savedUserId, setSavedUserId] = useState<string>("unknown-user");
 
-  const bgColor = isDark ? colors.background : "#FFF1E5";
-  const textColor = isDark ? colors.text : "#9C4400";
-  const subtextColor = isDark ? colors.subtext : "#896D59";
-  const btnBgColor = isDark ? colors.primaryButton : "#FFDEBA";
-  const btnTextColor = isDark ? "#F0CEAB" : "#000000";
-  const trackBgColor = isDark ? "#333333" : "#E5E5E5";
+  const trackBgColor = isDark ? "rgba(255,255,255,0.15)" : "rgba(148,102,86,0.2)";
 
   const handleContinue = async () => {
     try {
@@ -115,155 +119,136 @@ export default function QARatingScreen() {
     setStep(2);
   };
 
+  const cardStyle = {
+    backgroundColor: glass.surface,
+    borderColor: glass.border,
+    ...SoftShadow,
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <ScreenShell
+      title="Feedback"
+      onBack={() => (step === 2 ? setStep(1) : router.back())}
+      contentStyle={styles.content}
+    >
+      {step === 1 ? (
+        <>
+          <MotiView
+            from={{ opacity: 0, translateY: 16 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={Motion.spring}
+            style={[styles.card, cardStyle]}
+          >
+            <Text style={[styles.questionText, { color: colors.text }]}>
+              From 1 to 20, how much did you enjoy the drink?
+            </Text>
+            <Text style={[styles.scoreText, { color: pop }]}>{score}</Text>
+            <Slider
+              style={{ width: "100%", height: 40 }}
+              minimumValue={1}
+              maximumValue={20}
+              step={1}
+              value={score}
+              onValueChange={setScore}
+              minimumTrackTintColor={pop}
+              maximumTrackTintColor={trackBgColor}
+              thumbTintColor={pop}
+            />
+          </MotiView>
 
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: btnBgColor }]}
-          onPress={() => (step === 2 ? setStep(1) : router.back())}
-          activeOpacity={0.8}
-        >
-          <ArrowLeft color={btnTextColor} size={24} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: textColor }]}>Feedback</Text>
-        <View style={{ width: 44 }} />
-      </View>
-
-      <View style={styles.content}>
-        {step === 1 ? (
-          <>
-            <View style={styles.questionBlock}>
-              <Text style={[styles.questionText, { color: textColor }]}>
-                From 1 to 15, how much did you enjoy the drink?
-              </Text>
-              <Text style={[styles.scoreText, { color: textColor }]}>
-                {score}
-              </Text>
-              <Slider
-                style={{ width: "100%", height: 40 }}
-                minimumValue={1}
-                maximumValue={15}
-                step={1}
-                value={score}
-                onValueChange={setScore}
-                minimumTrackTintColor={btnBgColor}
-                maximumTrackTintColor={trackBgColor}
-                thumbTintColor={btnBgColor}
-              />
-            </View>
-
-            <View style={styles.questionBlock}>
-              <Text style={[styles.questionText, { color: textColor }]}>
-                How was the strength of your coffee?
-              </Text>
-              <View style={styles.pillContainer}>
-                {["Too Weak", "Perfect", "Too Strong"].map((option) => {
-                  const isActive = strength === option;
-                  return (
-                    <TouchableOpacity
-                      key={option}
+          <MotiView
+            from={{ opacity: 0, translateY: 16 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 120 }}
+            style={[styles.card, cardStyle]}
+          >
+            <Text style={[styles.questionText, { color: colors.text }]}>
+              How was the strength of your coffee?
+            </Text>
+            <View style={styles.pillContainer}>
+              {["Too Weak", "Perfect", "Too Strong"].map((option) => {
+                const isActive = strength === option;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    activeOpacity={0.85}
+                    onPress={() => setStrength(option)}
+                    style={[
+                      styles.pill,
+                      { borderColor: isActive ? "transparent" : glass.border },
+                      !isActive && { backgroundColor: "rgba(255,255,255,0.55)" },
+                    ]}
+                  >
+                    {isActive && (
+                      <LinearGradient
+                        colors={[pop, accent]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    )}
+                    <Text
                       style={[
-                        styles.pill,
-                        {
-                          backgroundColor: isActive
-                            ? btnBgColor
-                            : "transparent",
-                          borderColor: btnBgColor,
-                          borderWidth: 2,
-                        },
+                        styles.pillText,
+                        { color: isActive ? "#fff" : colors.text },
                       ]}
-                      onPress={() => setStrength(option)}
                     >
-                      <Text
-                        style={[
-                          styles.pillText,
-                          { color: isActive ? btnTextColor : textColor },
-                        ]}
-                      >
-                        {option}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+          </MotiView>
 
-            <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                { backgroundColor: btnBgColor, marginTop: "auto" },
-              ]}
-              onPress={handleContinue}
-            >
-              <Text style={[styles.primaryBtnText, { color: btnTextColor }]}>
-                Continue
-              </Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <View style={styles.recommendationBlock}>
-            <Text style={[styles.recommendTitle, { color: textColor }]}>
-              Thanks for your feedback!
-            </Text>
-            <Text style={[styles.recommendSub, { color: subtextColor }]}>
-              The machine learned from your rating and automatically adjusted
-              parameters for your next "My Perfect Cup" brew.
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                { backgroundColor: btnBgColor, marginTop: 20 },
-              ]}
-              onPress={() => router.replace("/(tabs)/home")}
-            >
-              <Text style={[styles.primaryBtnText, { color: btnTextColor }]}>
-                Go Back Home
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    </SafeAreaView>
+          <View style={{ flex: 1 }} />
+          <GradientButton label="Continue" onPress={handleContinue} />
+        </>
+      ) : (
+        <View style={styles.recommendationBlock}>
+          <BeanConfetti colors={[pop, accent, "#E1B09C"]} />
+          <MotiView
+            from={{ opacity: 0, scale: 0.4 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={Motion.spring}
+          >
+            <HeartCupIcon width={150} />
+          </MotiView>
+          <Text style={[styles.recommendTitle, { color: colors.text }]}>
+            Thanks for your feedback!
+          </Text>
+          <Text style={[styles.recommendSub, { color: colors.subtext }]}>
+            The machine learned from your rating and automatically adjusted
+            parameters for your next "My Perfect Cup" brew.
+          </Text>
+          <GradientButton
+            label="Go Back Home"
+            onPress={() => router.replace("/(tabs)/home")}
+          />
+        </View>
+      )}
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 15,
+  content: { paddingHorizontal: 24, paddingBottom: 24, paddingTop: 8, gap: 18 },
+  card: {
+    borderRadius: Radii.xl,
+    borderWidth: 1,
+    padding: 22,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: { fontSize: 24, fontWeight: "800", fontFamily: "serif" },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 20,
-  },
-  questionBlock: { marginBottom: 40 },
   questionText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    marginBottom: 20,
+    marginBottom: 14,
     textAlign: "center",
   },
   scoreText: {
-    fontSize: 48,
+    fontSize: 56,
     fontWeight: "800",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 6,
   },
   pillContainer: {
     flexDirection: "row",
@@ -271,30 +256,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
-  pill: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 25 },
-  pillText: { fontSize: 16, fontWeight: "700" },
+  pill: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  pillText: { fontSize: 15, fontWeight: "800" },
   recommendationBlock: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    gap: 12,
   },
   recommendTitle: {
+    fontFamily: "serif",
     fontSize: 28,
     fontWeight: "800",
     textAlign: "center",
-    marginBottom: 15,
+    marginTop: 10,
   },
   recommendSub: {
     fontSize: 16,
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 18,
     lineHeight: 24,
   },
-  primaryBtn: {
-    width: "100%",
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  primaryBtnText: { fontSize: 18, fontWeight: "800" },
 });

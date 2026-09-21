@@ -1,36 +1,38 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
 import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { ArrowLeft, Beaker } from "lucide-react-native";
+import { MotiView } from "moti";
 import { useState } from "react";
-import {
-  Alert,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 
 import { savePourProfile } from "../src/backend/api/database";
 import { getSessionUser } from "../src/backend/auth/session";
+import { GradientButton } from "../src/components/auth/AuthControls";
+import HeartCupIcon from "../src/components/HeartCupIcon";
+import ScreenShell from "../src/components/ScreenShell";
+import {
+  Glass,
+  Motion,
+  Pop,
+  Radii,
+  SoftShadow,
+} from "../src/constants/DesignSystem";
+
+// Friendly word for where the slider sits (1-20)
+const describe = (v: number) => (v <= 7 ? "Mild" : v <= 14 ? "Balanced" : "Bold");
 
 export default function CreateRecipeScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const isDark = theme === "dark";
+  const glass = isDark ? Glass.dark : Glass.light;
+  const pop = isDark ? Pop.dark : Pop.light;
 
   const [sliderValue, setSliderValue] = useState(8);
   const [isSaving, setIsSaving] = useState(false);
 
-  const bgColor = isDark ? colors.background : "#FFF1E5";
-  const textColor = isDark ? colors.text : "#9C4400";
-  const subtextColor = isDark ? colors.subtext : "#896D59";
-  const btnBgColor = isDark ? colors.primaryButton : "#FFDEBA";
-  const btnTextColor = isDark ? "#F0CEAB" : "#000000";
-  const trackBgColor = isDark ? "#333333" : "#E5E5E5";
+  const trackBgColor = isDark ? "rgba(255,255,255,0.15)" : "rgba(148,102,86,0.2)";
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -83,32 +85,54 @@ export default function CreateRecipeScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: btnBgColor }]}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-          disabled={isSaving}
+    <ScreenShell
+      title="Taste Profile"
+      onBack={() => router.back()}
+      backDisabled={isSaving}
+      contentStyle={styles.content}
+    >
+      <MotiView
+        from={{ opacity: 0, scale: 0.6, translateY: 20 }}
+        animate={{ opacity: 1, scale: 1, translateY: 0 }}
+        transition={Motion.spring}
+        style={styles.iconContainer}
+      >
+        <MotiView
+          from={{ translateY: 0, rotate: "-3deg" }}
+          animate={{ translateY: -6, rotate: "3deg" }}
+          transition={{
+            type: "timing",
+            duration: 2600,
+            loop: true,
+            repeatReverse: true,
+          }}
         >
-          <ArrowLeft color={btnTextColor} size={24} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: textColor }]}>Taste Profile</Text>
-        <View style={{ width: 44 }} />
-      </View>
+          <HeartCupIcon width={130} />
+        </MotiView>
+      </MotiView>
 
-      <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Beaker color={textColor} size={64} />
-        </View>
-
-        <Text style={[styles.label, { color: textColor }]}>
-          Set your baseline strength preference:
+      <MotiView
+        from={{ opacity: 0, translateY: 20 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ ...Motion.spring, delay: 150 }}
+        style={[
+          styles.card,
+          {
+            backgroundColor: glass.surface,
+            borderColor: glass.border,
+            ...SoftShadow,
+          },
+        ]}
+      >
+        <Text style={[styles.label, { color: colors.text }]}>
+          Set your baseline strength preference
         </Text>
 
-        <Text style={[styles.sliderValueText, { color: btnBgColor }]}>
+        <Text style={[styles.sliderValueText, { color: pop }]}>
           {sliderValue}
+        </Text>
+        <Text style={[styles.descriptor, { color: colors.subtext }]}>
+          {describe(sliderValue)}
         </Text>
 
         <Slider
@@ -118,76 +142,61 @@ export default function CreateRecipeScreen() {
           step={1}
           value={sliderValue}
           onValueChange={setSliderValue}
-          minimumTrackTintColor={btnBgColor}
+          minimumTrackTintColor={pop}
           maximumTrackTintColor={trackBgColor}
-          thumbTintColor={btnBgColor}
+          thumbTintColor={pop}
         />
 
         <View style={styles.sliderLabelsRow}>
-          <Text style={[styles.sliderSubLabel, { color: subtextColor }]}>
+          <Text style={[styles.sliderSubLabel, { color: colors.subtext }]}>
             Weak
           </Text>
-          <Text style={[styles.sliderSubLabel, { color: subtextColor }]}>
+          <Text style={[styles.sliderSubLabel, { color: colors.subtext }]}>
             Strong
           </Text>
         </View>
+      </MotiView>
 
-        <View style={{ flex: 1 }} />
+      <View style={{ flex: 1 }} />
 
-        <Text style={[styles.infoText, { color: subtextColor }]}>
-          We will use this to brew your first cup. After you rate it, the
-          machine will learn and automatically adjust for next time!
-        </Text>
+      <Text style={[styles.infoText, { color: colors.subtext }]}>
+        We will use this to brew your first cup. After you rate it, the machine
+        will learn and automatically adjust for next time!
+      </Text>
 
-        <TouchableOpacity
-          style={[styles.primaryBtn, { backgroundColor: btnBgColor }]}
-          onPress={handleSave}
-          disabled={isSaving}
-        >
-          <Text style={[styles.primaryBtnText, { color: btnTextColor }]}>
-            {isSaving ? "Saving..." : "Create My Profile"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      <GradientButton
+        label={isSaving ? "Saving..." : "Create My Profile"}
+        onPress={handleSave}
+        loading={isSaving}
+      />
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 15,
+  content: { paddingHorizontal: 24, paddingBottom: 24, paddingTop: 6 },
+  iconContainer: { alignItems: "center", marginBottom: 18 },
+  card: {
+    borderRadius: Radii.xl,
+    borderWidth: 1,
+    padding: 22,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: { fontSize: 24, fontWeight: "800", fontFamily: "serif" },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 20,
-  },
-  iconContainer: { alignItems: "center", marginBottom: 30 },
   label: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    marginBottom: 10,
+    marginBottom: 6,
     textAlign: "center",
   },
   sliderValueText: {
-    fontSize: 48,
+    fontSize: 56,
     fontWeight: "800",
     textAlign: "center",
-    marginBottom: 5,
+  },
+  descriptor: {
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 8,
   },
   sliderLabelsRow: {
     flexDirection: "row",
@@ -198,15 +207,8 @@ const styles = StyleSheet.create({
   infoText: {
     textAlign: "center",
     fontSize: 14,
-    marginBottom: 20,
+    marginBottom: 18,
     paddingHorizontal: 10,
     lineHeight: 20,
   },
-  primaryBtn: {
-    width: "100%",
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  primaryBtnText: { fontSize: 18, fontWeight: "800" },
 });

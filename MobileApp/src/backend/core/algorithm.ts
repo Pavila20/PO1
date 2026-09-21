@@ -10,15 +10,15 @@ const MAX_WEIGHT = 28;
 
 export const calculateNewProfile = (
   currentProfile: PourProfile,
-  rating: number, // 1-15 enjoyment scale
+  rating: number, // 1-20 enjoyment scale
   perceivedStrength: "Too weak" | "Just right" | "Too strong",
 ): Omit<PourProfile, "profileId" | "createdAt"> => {
   let newTemp = currentProfile.targetTemp;
   let newGrind = currentProfile.grindSize;
   let newWeight = currentProfile.coffeeWeight || 20;
 
-  // 1. Perfection threshold (14-15 score = no change)
-  if (rating >= 14 && perceivedStrength === "Just right") {
+  // 1. Perfection threshold (19-20 score = no change)
+  if (rating >= 19 && perceivedStrength === "Just right") {
     return {
       userId: currentProfile.userId,
       name: currentProfile.name,
@@ -33,7 +33,7 @@ export const calculateNewProfile = (
   }
 
   // 2. Learning Rate Calculation (Severity)
-  const severity = (15 - rating) / 15;
+  const severity = (20 - rating) / 20;
 
   // Math.max(1, ...) ensures that if you select "Too weak/strong",
   // it always adjusts by AT LEAST 1 unit, but caps the maximum jump to a realistic amount.
@@ -50,7 +50,7 @@ export const calculateNewProfile = (
     newTemp -= tempDelta; // Decrease Heat
     newGrind += grindDelta; // Coarser Grind
     newWeight -= weightDelta; // Fewer Beans
-  } else if (perceivedStrength === "Just right" && rating < 14) {
+  } else if (perceivedStrength === "Just right" && rating < 19) {
     newTemp -= 1; // Slight bitterness tweak
   }
 

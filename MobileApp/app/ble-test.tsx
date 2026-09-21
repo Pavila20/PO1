@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: "700" },
   primaryBtn: {
-    backgroundColor: "#A9612F",
+    backgroundColor: "#946656",
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",

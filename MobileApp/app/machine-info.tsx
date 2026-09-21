@@ -1,19 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import {
-  Bean,
-  ChevronLeft,
-  Coffee,
-  Droplet,
-  Info,
-  Thermometer,
-  Trash2,
-} from "lucide-react-native";
+import { ChevronLeft, Info, Thermometer, Trash2 } from "lucide-react-native";
+import { MotiView } from "moti";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -21,15 +15,31 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
+import { getMachineStatus } from "../src/backend/api/machine";
+import BeanBackground from "../src/components/BeanBackground";
+import { CoffeeCupIcon, MachineIcon } from "../src/components/icons/CoffeeIcons";
 import {
-  getMachineStatus,
-  sendMachineCommand,
-} from "../src/backend/api/machine";
+  Accent,
+  Glass,
+  Gradients,
+  Latte,
+  Motion,
+  Orbs,
+  Pop,
+  Radii,
+  SoftShadow,
+} from "../src/constants/DesignSystem";
 
 export default function MachineInfoScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const isDark = theme === "dark";
+  const g = isDark ? Gradients.dark : Gradients.light;
+  const glass = isDark ? Glass.dark : Glass.light;
+  const pop = isDark ? Pop.dark : Pop.light;
+  const accent = isDark ? Accent.dark : Accent.light;
+  const latte = isDark ? Latte.dark : Latte.light;
+  const beanOpacity = isDark ? Orbs.dark.opacity : Orbs.light.opacity;
 
   const [machineData, setMachineData] = useState<any>(null);
 
@@ -80,13 +90,7 @@ export default function MachineInfoScreen() {
       loadStats();
     }, []),
   );
-  const handleRefill = async () => {
-    await sendMachineCommand("REFILL");
-    Alert.alert("Refilled!", "The machine levels have been reset to 100%.");
-    // Force a quick UI refresh
-    const data = await getMachineStatus();
-    setMachineData(data);
-  };
+
   const handleUnpair = () => {
     Alert.alert(
       "Unpair Machine",
@@ -105,288 +109,231 @@ export default function MachineInfoScreen() {
     );
   };
 
+  const cardStyle = {
+    backgroundColor: glass.surface,
+    borderColor: glass.border,
+    ...SoftShadow,
+  };
+
+  const stats = [
+    { label: "Made coffee", value: `${cupsMade} cups` },
+    { label: "Time in use", value: `${daysInUse} days` },
+    {
+      label: "Preference",
+      value: isNaN(Number(coffeePref)) ? coffeePref : `Level ${coffeePref}`,
+    },
+  ];
+
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={["top"]}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* --- Top Bar --- */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <ChevronLeft color={colors.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            PourOver1
-          </Text>
-          <TouchableOpacity style={styles.helpButton}>
-            <Info color="#fff" size={20} />
-          </TouchableOpacity>
-        </View>
+    <LinearGradient colors={g.screen} style={{ flex: 1 }}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <BeanBackground colors={[pop, latte, accent]} opacity={beanOpacity} />
 
-        {/* --- Machine Image Section --- */}
-        <View style={styles.imageSection}>
-          <View style={styles.imageCircle}>
-            <Image
-              source={require("../assets/images/PO1.png")}
-              style={styles.machineImage}
-              contentFit="contain"
-            />
-          </View>
-        </View>
-
-        {/* --- Summary Section --- */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Summary
-          </Text>
-
-          <View style={styles.summaryRow}>
-            <View style={styles.taskCard}>
-              <View style={styles.iconCircle}>
-                <Droplet size={20} color="#fff" />
-              </View>
-              <View style={styles.taskText}>
-                <Text style={styles.taskTitle}>
-                  {machineData?.waterLevel ?? "--"}%
-                </Text>
-                <Text style={styles.taskSubtitle}>water</Text>
-              </View>
-            </View>
-
-            <View style={styles.taskCard}>
-              <View style={styles.iconCircle}>
-                <Bean size={20} color="#fff" />
-              </View>
-              <View style={styles.taskText}>
-                <Text style={styles.taskTitle}>
-                  {machineData?.beanLevel ?? "--"}%
-                </Text>
-                <Text style={styles.taskSubtitle}>beans</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <View style={styles.taskCard}>
-              <View style={styles.iconCircle}>
-                <Coffee size={20} color="#fff" />
-              </View>
-              <View style={styles.taskText}>
-                {/* --- NEW: Dynamic Cup Display --- */}
-                <Text style={styles.taskTitle}>
-                  {machineData?.cupPresent === false ? "No" : "Yes"}
-                </Text>
-                <Text style={styles.taskSubtitle}>cup</Text>
-              </View>
-            </View>
-
-            <View style={styles.taskCard}>
-              <View style={styles.iconCircle}>
-                <Thermometer size={20} color="#fff" />
-              </View>
-              <View style={styles.taskText}>
-                <Text style={styles.taskTitle}>
-                  {machineData?.boilerTemp ?? "--"}°F
-                </Text>
-                <Text style={styles.taskSubtitle}>water temp</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* --- Statistics Section --- */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Statistic
-          </Text>
-
-          <View style={styles.statsList}>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Made coffee</Text>
-              <Text style={styles.statValue}>{cupsMade} cups</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Time in use</Text>
-              <Text style={styles.statValue}>{daysInUse} days</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Preference</Text>
-              <Text style={styles.statValue}>
-                {/* Now properly displays: Level 12 */}
-                {isNaN(Number(coffeePref)) ? coffeePref : `Level ${coffeePref}`}
-              </Text>
-            </View>
-          </View>
-        </View>
-        {/* --- Unpair Button --- */}
-        <TouchableOpacity
-          style={styles.unpairButton}
-          onPress={handleUnpair}
-          activeOpacity={0.8}
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Trash2 color="#fff" size={20} />
-          <Text style={styles.unpairText}>Unpair Machine</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* --- Top Bar --- */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={[styles.roundButton, cardStyle]}
+            >
+              <ChevronLeft color={colors.text} size={22} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              PourOver1
+            </Text>
+            <TouchableOpacity style={[styles.roundButton, { backgroundColor: pop }]}>
+              <Info color="#fff" size={18} />
+            </TouchableOpacity>
+          </View>
 
-      {/* Decorative SVG in bottom right corner */}
-      <View style={styles.bottomDecoration} pointerEvents="none">
-        <Image
-          source={require("../assets/images/Group 1547.svg")}
-          style={styles.decorationImage}
-          contentFit="contain"
-        />
-      </View>
-    </SafeAreaView>
+          {/* --- Machine --- */}
+          <MotiView
+            from={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={Motion.spring}
+            style={styles.imageSection}
+          >
+            <MotiView
+              from={{ translateY: 0 }}
+              animate={{ translateY: -8 }}
+              transition={{
+                type: "timing",
+                duration: 2400,
+                loop: true,
+                repeatReverse: true,
+              }}
+            >
+              <LinearGradient
+                colors={g.heroSoft}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.imageCircle, SoftShadow]}
+              >
+                <MachineIcon size={128} />
+              </LinearGradient>
+            </MotiView>
+          </MotiView>
+
+          {/* --- Summary Section --- */}
+          <MotiView
+            from={{ opacity: 0, translateY: 16 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 120 }}
+            style={styles.section}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Summary
+            </Text>
+
+            <View style={styles.summaryRow}>
+              <View style={[styles.taskCard, cardStyle]}>
+                <CoffeeCupIcon size={40} />
+                <View style={styles.taskText}>
+                  <Text style={[styles.taskTitle, { color: colors.text }]}>
+                    {machineData?.cupPresent === false ? "No" : "Yes"}
+                  </Text>
+                  <Text style={[styles.taskSubtitle, { color: colors.subtext }]}>
+                    cup
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.taskCard, cardStyle]}>
+                <View style={[styles.iconCircle, { backgroundColor: pop }]}>
+                  <Thermometer size={20} color="#fff" />
+                </View>
+                <View style={styles.taskText}>
+                  <Text style={[styles.taskTitle, { color: colors.text }]}>
+                    {machineData?.boilerTemp ?? "--"}°F
+                  </Text>
+                  <Text style={[styles.taskSubtitle, { color: colors.subtext }]}>
+                    water temp
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </MotiView>
+
+          {/* --- Statistics Section --- */}
+          <MotiView
+            from={{ opacity: 0, translateY: 16 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 220 }}
+            style={styles.section}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Statistics
+            </Text>
+
+            <View style={[styles.statsList, cardStyle]}>
+              {stats.map((s, i) => (
+                <View
+                  key={s.label}
+                  style={[
+                    styles.statRow,
+                    i > 0 && {
+                      borderTopWidth: 1,
+                      borderTopColor: "rgba(148,102,86,0.15)",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.statLabel, { color: colors.subtext }]}>
+                    {s.label}
+                  </Text>
+                  <Text style={[styles.statValue, { color: colors.text }]}>
+                    {s.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </MotiView>
+
+          {/* --- Unpair Button --- */}
+          <TouchableOpacity
+            style={[styles.unpairButton, { borderColor: "#E5738A" }]}
+            onPress={handleUnpair}
+            activeOpacity={0.8}
+          >
+            <Trash2 color="#E5738A" size={20} />
+            <Text style={styles.unpairText}>Unpair Machine</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-    gap: 24,
-  },
+  container: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40, gap: 24 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingTop: 10,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    fontFamily: "Inter-ExtraBold",
-  },
-  helpButton: {
-    backgroundColor: "#A9612F",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  roundButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.9)",
     justifyContent: "center",
     alignItems: "center",
   },
-  imageSection: {
-    alignItems: "center",
-    marginVertical: 10,
-  },
+  headerTitle: { fontSize: 24, fontWeight: "800" },
+  imageSection: { alignItems: "center", marginVertical: 6 },
   imageCircle: {
-    backgroundColor: "#A9612F",
-    width: 172,
-    height: 172,
-    borderRadius: 86,
+    width: 184,
+    height: 184,
+    borderRadius: 92,
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
   },
-  machineImage: {
-    width: 100,
-    height: 120,
-  },
-  section: {
-    gap: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    fontFamily: "Inter-SemiBold",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  section: { gap: 14 },
+  sectionTitle: { fontSize: 20, fontWeight: "700" },
+  summaryRow: { flexDirection: "row", gap: 12 },
   taskCard: {
     flex: 1,
-    backgroundColor: "#A9612F",
-    borderRadius: 15,
+    borderRadius: Radii.md,
+    borderWidth: 1,
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
   iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#535353",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  taskText: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  taskTitle: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  taskSubtitle: {
-    color: "#ffffff",
-    fontSize: 12,
-    opacity: 0.8,
-  },
-  statsList: {
-    borderRadius: 15,
-    overflow: "hidden",
-    gap: 1,
-    backgroundColor: "rgba(0,0,0,0.1)",
-  },
+  taskText: { flex: 1, justifyContent: "center" },
+  taskTitle: { fontSize: 16, fontWeight: "800" },
+  taskSubtitle: { fontSize: 12 },
+  statsList: { borderRadius: Radii.md, borderWidth: 1, overflow: "hidden" },
   statRow: {
     flexDirection: "row",
-    backgroundColor: "#A9612F",
     padding: 16,
     justifyContent: "space-between",
     alignItems: "center",
   },
-  statLabel: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  statValue: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "right",
-  },
+  statLabel: { fontSize: 14, fontWeight: "600" },
+  statValue: { fontSize: 14, fontWeight: "700", textAlign: "right" },
   unpairButton: {
-    backgroundColor: "#e72020",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     padding: 16,
-    borderRadius: 16,
+    borderRadius: Radii.pill,
+    borderWidth: 1.5,
     gap: 10,
-    marginTop: 20,
+    marginTop: 4,
   },
-  unpairText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  bottomDecoration: {
-    position: "absolute",
-    bottom: -20,
-    right: 0,
-    zIndex: -1,
-  },
-  decorationImage: {
-    width: 90,
-    height: 250,
-  },
+  unpairText: { color: "#E5738A", fontSize: 16, fontWeight: "800" },
 });

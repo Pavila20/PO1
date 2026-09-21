@@ -1,33 +1,33 @@
 export const Colors = {
   light: {
     // Backgrounds
-    background: "#FFF7ED", // Cream
+    background: "#FFF1F7", // Blush tint
     card: "#FFFFFF", // White Card
-    widgetBackground: "#F0CEAB", // Light Sand
+    widgetBackground: "#FFBCDA", // Candy pink
 
     // Standard Text
-    text: "#5C3A21", // Dark Brown
-    subtext: "#896D59", // Medium Brown
+    text: "#5A3A30", // Deep mocha
+    subtext: "#946656", // Mocha
 
     // --- NEW: Specific Text Colors for Cards ---
     // In Light Mode, cards are white, so text must be dark
-    cardHeader: "#5C3A21",
-    cardSubtext: "#896D59",
+    cardHeader: "#5A3A30",
+    cardSubtext: "#946656",
 
     // Widget Text (Widget is always light colored, so text is always dark)
-    widgetText: "#5C3A21",
+    widgetText: "#5A3A30",
 
     // Input Fields
     inputBackground: "#FFFFFF",
-    inputBorder: "#D6D3D1",
-    inputText: "#5C3A21",
+    inputBorder: "#E1B09C",
+    inputText: "#5A3A30",
     inputPlaceholder: "#A1A1AA",
-    inputIcon: "#896D59",
+    inputIcon: "#946656",
 
     // Buttons & Brand
-    primaryButton: "#A9612F",
-    primaryButtonText: "#FFF7ED",
-    tint: "#A9612F",
+    primaryButton: "#946656",
+    primaryButtonText: "#FFF1F7",
+    tint: "#946656",
 
     // Social & Footer
     socialButtonBackground: "#FFFFFF",
@@ -35,20 +35,20 @@ export const Colors = {
     socialButtonText: "#52525B",
     socialButtonTextLabel: "#71717A",
     footerText: "#A3A3A3",
-    link: "#A9612F",
+    link: "#946656",
   },
   dark: {
     // Backgrounds
-    background: "#2C2929", // Dark Charcoal
-    card: "#A9612F", // Brand Orange (CSS Design)
-    widgetBackground: "#E6B786", // Light Sand (CSS Design)
+    background: "#1F1619", // Deep cocoa
+    card: "#946656", // Mocha
+    widgetBackground: "#E1B09C", // Latte
 
     // Standard Text
-    text: "#F0CEAB", // Light Beige
-    subtext: "#D1D1D1", // Light Grey
+    text: "#FFD6E9", // Blush
+    subtext: "#E1B09C", // Latte
 
     // --- NEW: Specific Text Colors for Cards ---
-    // In Dark Mode, cards are Orange, so text must be White
+    // In Dark Mode, cards are Mocha, so text must be White
     cardHeader: "#FFFFFF",
     cardSubtext: "rgba(255, 255, 255, 0.8)",
 
@@ -56,16 +56,16 @@ export const Colors = {
     widgetText: "#000000",
 
     // Input Fields
-    inputBackground: "#1C1917",
-    inputBorder: "#2C2929",
+    inputBackground: "#2B1E20",
+    inputBorder: "#4A3236",
     inputText: "#FFFFFF",
     inputPlaceholder: "#A1A1AA",
-    inputIcon: "#F0CEAB",
+    inputIcon: "#FFBCDA",
 
     // Buttons & Brand
-    primaryButton: "#A9612F",
-    primaryButtonText: "#F0CEAB",
-    tint: "#F0CEAB",
+    primaryButton: "#946656",
+    primaryButtonText: "#FFD6E9",
+    tint: "#FFBCDA",
 
     // Social & Footer
     socialButtonBackground: "#FFFFFF",
@@ -73,7 +73,7 @@ export const Colors = {
     socialButtonText: "#52525B",
     socialButtonTextLabel: "#A3A3A3",
     footerText: "#A3A3A3",
-    link: "#F0CEAB",
+    link: "#FFBCDA",
   },
 };
 

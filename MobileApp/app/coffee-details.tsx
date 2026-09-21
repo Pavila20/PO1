@@ -3,8 +3,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { ArrowLeft, Trash2 } from "lucide-react-native";
+import { Info, Trash2 } from "lucide-react-native";
 import { MotiView } from "moti";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -19,17 +18,24 @@ import {
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { useTheme } from "../context/ThemeContext";
+import BeanBackground from "../src/components/BeanBackground";
+import { GradientButton } from "../src/components/auth/AuthControls";
+import RecipeIcon from "../src/components/icons/RecipeIcon";
+import ScreenShell from "../src/components/ScreenShell";
+import {
+  Accent,
+  Glass,
+  Gradients,
+  Latte,
+  Motion,
+  Orbs,
+  Pop,
+  SoftShadow,
+} from "../src/constants/DesignSystem";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-const coffeeImages: Record<string, any> = {
-  "Cream Latte": require("../assets/images/CreamLatteCoffeeIcon.png"),
-  "Dark Coffee": require("../assets/images/DarkCoffeeIcon.png"),
-  "Light Coffee": require("../assets/images/LightCoffeeIcon.png"),
-};
 
 const tutorialData = [
   {
@@ -66,7 +72,7 @@ const tutorialData = [
 
 type BitternessLevel = "Low" | "Medium" | "High";
 
-const CustomBean = ({ color = "#A9612F", size = 29 }) => (
+const CustomBean = ({ color = "#946656", size = 29 }) => (
   <Svg height={size} width={size} fill="none" viewBox="0 0 29 29">
     <Path
       d="M22.5044 22.5034C16.6948 28.3107 8.36376 29.3975 3.89734 24.9288C-0.573655 20.4601 0.515492 12.1313 6.32275 6.32178C12.1346 0.514517 20.4657 -0.572342 24.9321 3.89637C29.4008 8.36278 28.3116 16.6938 22.5044 22.5034Z"
@@ -150,20 +156,27 @@ export default function CoffeeDetailsScreen() {
 
   const { name, strength, isCustom, recipeId } = useLocalSearchParams();
   const coffeeName = (name as string) || "Light Coffee";
-  const coffeeImage = require("../assets/images/MorningCoffeeIcon.png"); // Using your smart coffee image
 
   const isDark = theme === "dark";
+  const g = isDark ? Gradients.dark : Gradients.light;
+  const glass = isDark ? Glass.dark : Glass.light;
+  const pop = isDark ? Pop.dark : Pop.light;
+  const accent = isDark ? Accent.dark : Accent.light;
+  const latte = isDark ? Latte.dark : Latte.light;
+  const beanOpacity = isDark ? Orbs.dark.opacity : Orbs.light.opacity;
 
   const [showTutorial, setShowTutorial] = useState(false);
+  // True when the user reopened the tutorial from "How it works" - then
+  // finishing/skipping just closes it instead of starting a brew.
+  const [isReplay, setIsReplay] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  // --- NEW: State for Bitterness and Number ---
+  // --- State for Bitterness and Number ---
   const [bitterness, setBitterness] = useState<BitternessLevel>("Medium");
   const [prefNumber, setPrefNumber] = useState<number>(8); // Default
 
-  // --- NEW: Pull the 1-15 number dynamically! ---
-
+  // --- Pull the 1-20 number dynamically! ---
   useFocusEffect(
     useCallback(() => {
       const loadBitterness = async () => {
@@ -192,19 +205,35 @@ export default function CoffeeDetailsScreen() {
   ).current;
   const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
-  // --- Dynamic Theme Colors ---
-  const bgColor = isDark ? colors.background : "#FFF1E5";
-  const textColor = isDark ? "#F0CEAB" : "#9C4400";
-  const subtextColor = isDark ? "#896D59" : "#896D59";
-  const btnBgColor = isDark ? colors.primaryButton : "#FFDEBA";
-  const btnTextColor = isDark ? "#F0CEAB" : "#000000";
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    setIsReplay(false);
+    setCurrentIndex(0);
+  };
+
+  // The tutorial only auto-shows the first time; after that Continue goes
+  // straight to brewing.
+  const handleContinue = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    let seen = false;
+    try {
+      seen = (await AsyncStorage.getItem("brew_tutorial_seen")) === "true";
+    } catch {}
+    if (seen) {
+      handleBrew();
+    } else {
+      setShowTutorial(true);
+    }
+  };
 
   const handleBrew = () => {
+    AsyncStorage.setItem("brew_tutorial_seen", "true").catch(() => {});
     setShowTutorial(false);
+    setIsReplay(false);
     setCurrentIndex(0);
     router.replace({
       pathname: "/active-brew",
-      // --- UPDATE: Pass all the data forward! ---
+      // Pass all the data forward
       params: {
         name: coffeeName,
         strength: strength as string,
@@ -223,13 +252,15 @@ export default function CoffeeDetailsScreen() {
       });
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      handleBrew();
+      if (isReplay) closeTutorial();
+      else handleBrew();
     }
   };
 
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    handleBrew();
+    if (isReplay) closeTutorial();
+    else handleBrew();
   };
 
   // --- DELETE CUSTOM RECIPE FROM DETAILS VIEW ---
@@ -259,45 +290,41 @@ export default function CoffeeDetailsScreen() {
     );
   };
 
+  const levels: BitternessLevel[] = ["Low", "Medium", "High"];
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: bgColor }]}
-        edges={["top", "bottom"]}
+      <ScreenShell
+        title={coffeeName}
+        onBack={() => router.back()}
+        right={
+          isCustom === "true" ? (
+            <TouchableOpacity
+              style={[
+                styles.roundButton,
+                {
+                  backgroundColor: glass.surface,
+                  borderColor: glass.border,
+                  ...SoftShadow,
+                },
+              ]}
+              onPress={handleDeleteCustomRecipe}
+              activeOpacity={0.8}
+            >
+              <Trash2 color="#E5738A" size={20} />
+            </TouchableOpacity>
+          ) : undefined
+        }
       >
-        <StatusBar style={isDark ? "light" : "dark"} />
-
         {/* --- TUTORIAL CAROUSEL MODAL --- */}
         <Modal visible={showTutorial} animationType="fade" transparent={true}>
-          <View style={styles.tutorialContainer}>
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: isDark ? "rgba(44, 41, 41, 1)" : "#FFF1E5" },
-              ]}
-            >
-              {isDark && (
-                <LinearGradient
-                  colors={[
-                    "rgba(44, 41, 41, 0.27)",
-                    "rgba(12, 15, 20, 1)",
-                    "rgba(12, 15, 20, 1)",
-                  ]}
-                  locations={[0, 0.56, 1]}
-                  style={StyleSheet.absoluteFill}
-                />
-              )}
-            </View>
+          <LinearGradient colors={g.screen} style={styles.tutorialContainer}>
+            <BeanBackground colors={[pop, latte, accent]} opacity={beanOpacity} />
 
             {/* Skip Button */}
             <View style={styles.tutorialHeader}>
               <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-                <Text
-                  style={[
-                    styles.skipText,
-                    { color: isDark ? "#ffffff" : "#000000" },
-                  ]}
-                >
+                <Text style={[styles.skipText, { color: colors.subtext }]}>
                   Skip
                 </Text>
               </TouchableOpacity>
@@ -329,12 +356,12 @@ export default function CoffeeDetailsScreen() {
                     </View>
                     <View style={styles.textContainer}>
                       <Text
-                        style={[styles.tutorialTitle, { color: textColor }]}
+                        style={[styles.tutorialTitle, { color: colors.text }]}
                       >
                         {item.title}
                       </Text>
                       <Text
-                        style={[styles.tutorialDesc, { color: subtextColor }]}
+                        style={[styles.tutorialDesc, { color: colors.subtext }]}
                       >
                         {item.desc}
                       </Text>
@@ -355,223 +382,170 @@ export default function CoffeeDetailsScreen() {
             </View>
 
             <View style={styles.footer}>
-              <TouchableOpacity
-                style={[
-                  styles.tutorialNextBtn,
-                  { backgroundColor: btnBgColor },
-                ]}
-                activeOpacity={0.8}
-                onPress={handleNext}
-              >
-                <Text
-                  style={[styles.tutorialNextText, { color: btnTextColor }]}
-                >
-                  {currentIndex === tutorialData.length - 1
-                    ? "Start Brewing"
-                    : "Next"}
-                </Text>
-              </TouchableOpacity>
+              <View style={{ width: 280 }}>
+                <GradientButton
+                  label={
+                    currentIndex === tutorialData.length - 1
+                      ? isReplay
+                        ? "Done"
+                        : "Start Brewing"
+                      : "Next"
+                  }
+                  onPress={handleNext}
+                />
+              </View>
             </View>
-          </View>
+          </LinearGradient>
         </Modal>
-
-        {/* --- Top Bar --- */}
-        <View style={styles.topBar}>
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: btnBgColor }]}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <ArrowLeft
-              color={btnTextColor === "#000000" ? "#000000" : "#fff"}
-              size={24}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: textColor }]}>{coffeeName}</Text>
-
-          {/* Conditional rendering for Delete Button if the coffee is custom */}
-          {isCustom === "true" ? (
-            <TouchableOpacity
-              style={[styles.backButton, { backgroundColor: btnBgColor }]}
-              onPress={handleDeleteCustomRecipe}
-              activeOpacity={0.8}
-            >
-              <Trash2 color="#FF3B30" size={20} />
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 44 }} />
-          )}
-        </View>
 
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <View
-            style={[styles.outerImageCard, { backgroundColor: btnBgColor }]}
+          {/* --- Hero: the recipe's illustration on a floating halo --- */}
+          <MotiView
+            from={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={Motion.spring}
+          >
+            <MotiView
+              from={{ translateY: 0 }}
+              animate={{ translateY: -8 }}
+              transition={{
+                type: "timing",
+                duration: 2400,
+                loop: true,
+                repeatReverse: true,
+              }}
+            >
+              <LinearGradient
+                colors={g.heroSoft}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.heroCircle, SoftShadow]}
+              >
+                <RecipeIcon name={coffeeName} size={150} />
+              </LinearGradient>
+            </MotiView>
+          </MotiView>
+
+          <MotiView
+            from={{ opacity: 0, translateY: 14 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 120 }}
+            style={styles.infoSection}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Coffee Information
+            </Text>
+            {/* Show the actual 1-20 number here! */}
+            <Text style={[styles.bitternessTitle, { color: pop }]}>
+              Bitterness Level: {prefNumber}/20
+            </Text>
+          </MotiView>
+
+          <MotiView
+            from={{ opacity: 0, translateY: 14 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ ...Motion.spring, delay: 200 }}
+            style={styles.selectorSection}
           >
             <View
               style={[
-                styles.innerImageCard,
-                { backgroundColor: isDark ? "#E6B786" : "#FFF1E5" },
+                styles.pillContainer,
+                {
+                  backgroundColor: glass.surface,
+                  borderColor: glass.border,
+                  ...SoftShadow,
+                },
               ]}
             >
-              <Image
-                source={coffeeImage}
-                style={styles.mainImage}
-                contentFit="contain"
-              />
-            </View>
-          </View>
-
-          <View style={styles.infoSection}>
-            <Text style={[styles.sectionTitle, { color: textColor }]}>
-              Coffee Information
-            </Text>
-            {/* Show the actual 1-15 number here! */}
-            <Text style={[styles.bitternessTitle, { color: textColor }]}>
-              Bitterness Level: {prefNumber}/20
-            </Text>
-          </View>
-
-          <View style={styles.selectorSection}>
-            <View
-              style={[styles.pillContainer, { backgroundColor: btnBgColor }]}
-            >
-              <View
-                style={[
-                  styles.beanCircle,
-                  bitterness === "Low" && [
-                    styles.beanCircleActive,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(240, 206, 171, 0.9)"
-                        : "rgba(255, 255, 255, 0.8)",
-                    },
-                  ],
-                ]}
-              >
-                <CustomBean
-                  size={28}
-                  color={bitterness === "Low" ? "#A9612F" : "rgba(0,0,0,0.2)"}
-                />
-              </View>
-              <View
-                style={[
-                  styles.beanCircle,
-                  bitterness === "Medium" && [
-                    styles.beanCircleActive,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(240, 206, 171, 0.9)"
-                        : "rgba(255, 255, 255, 0.8)",
-                    },
-                  ],
-                ]}
-              >
-                <CustomBean
-                  size={28}
-                  color={
-                    bitterness === "Medium" ? "#A9612F" : "rgba(0,0,0,0.2)"
-                  }
-                />
-              </View>
-              <View
-                style={[
-                  styles.beanCircle,
-                  bitterness === "High" && [
-                    styles.beanCircleActive,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(240, 206, 171, 0.9)"
-                        : "rgba(255, 255, 255, 0.8)",
-                    },
-                  ],
-                ]}
-              >
-                <CustomBean
-                  size={28}
-                  color={bitterness === "High" ? "#A9612F" : "rgba(0,0,0,0.2)"}
-                />
-              </View>
+              {levels.map((level) => {
+                const active = bitterness === level;
+                return (
+                  <MotiView
+                    key={level}
+                    animate={{ scale: active ? 1.08 : 1 }}
+                    transition={{ type: "spring", damping: 12 }}
+                    style={[
+                      styles.beanCircle,
+                      active && {
+                        backgroundColor: "rgba(242,127,174,0.2)",
+                        borderColor: pop,
+                        borderWidth: 2,
+                      },
+                    ]}
+                  >
+                    <CustomBean
+                      size={28}
+                      color={active ? pop : "rgba(148,102,86,0.35)"}
+                    />
+                  </MotiView>
+                );
+              })}
             </View>
             <View style={styles.labelsRow}>
-              <Text
-                style={[
-                  styles.labelText,
-                  { color: isDark ? "#fff" : "#000000" },
-                ]}
-              >
-                Low
-              </Text>
-              <Text
-                style={[
-                  styles.labelText,
-                  { color: isDark ? "#fff" : "#000000" },
-                ]}
-              >
-                Medium
-              </Text>
-              <Text
-                style={[
-                  styles.labelText,
-                  { color: isDark ? "#fff" : "#000000" },
-                ]}
-              >
-                High
-              </Text>
+              {levels.map((level) => (
+                <Text
+                  key={level}
+                  style={[
+                    styles.labelText,
+                    {
+                      color: bitterness === level ? colors.text : colors.subtext,
+                    },
+                  ]}
+                >
+                  {level}
+                </Text>
+              ))}
             </View>
-          </View>
+          </MotiView>
 
-          <TouchableOpacity
-            style={[styles.continueButton, { backgroundColor: btnBgColor }]}
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowTutorial(true);
-            }}
-          >
-            <Text style={[styles.continueButtonText, { color: btnTextColor }]}>
-              Continue
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.continueWrap}>
+            <GradientButton label="Continue" onPress={handleContinue} />
+            <TouchableOpacity
+              onPress={() => {
+                setIsReplay(true);
+                setShowTutorial(true);
+              }}
+              style={styles.replayLink}
+            >
+              <Info size={16} color={colors.subtext} />
+              <Text style={[styles.replayText, { color: colors.subtext }]}>
+                How it works
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
-      </SafeAreaView>
+      </ScreenShell>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  roundButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  tutorialContainer: {
-    flex: 1,
-  },
+  tutorialContainer: { flex: 1 },
   tutorialHeader: {
     position: "absolute",
     top: 60,
     right: 24,
     zIndex: 20,
   },
-  skipButton: {
-    padding: 10,
-  },
-  skipText: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    fontWeight: "400",
-    letterSpacing: -0.24,
-    lineHeight: 20,
-  },
+  skipButton: { padding: 10 },
+  skipText: { fontSize: 15, fontWeight: "600" },
   carouselWrapper: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  slideContainer: {
-    alignItems: "center",
-  },
+  slideContainer: { alignItems: "center" },
   visualContainer: {
     height: 265,
     width: 275,
@@ -579,10 +553,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 35,
   },
-  tutorialImage: {
-    width: "100%",
-    height: "100%",
-  },
+  tutorialImage: { width: "100%", height: "100%" },
   textContainer: {
     width: 316,
     alignItems: "center",
@@ -590,15 +561,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tutorialTitle: {
-    fontFamily: "Inter-ExtraBold",
-    fontSize: 20,
+    fontFamily: "serif",
+    fontSize: 22,
     fontWeight: "800",
     textAlign: "center",
-    lineHeight: 35,
+    lineHeight: 32,
   },
   tutorialDesc: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "400",
     textAlign: "center",
     lineHeight: 22,
@@ -615,91 +585,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 20,
   },
-  tutorialNextBtn: {
-    borderRadius: 20,
-    paddingVertical: 10,
-    width: 249,
-    height: 55,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tutorialNextText: {
-    fontFamily: "Inter-SemiBold",
-    fontSize: 18,
-    fontWeight: "600",
-    lineHeight: 35,
-  },
 
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 15,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontFamily: "serif",
-    fontSize: 24,
-    fontWeight: "800",
-  },
   scrollContainer: {
     alignItems: "center",
     paddingTop: 10,
     paddingBottom: 40,
   },
-  outerImageCard: {
-    width: 280,
-    height: 330,
-    borderRadius: 35,
-    padding: 24,
+  heroCircle: {
+    width: 230,
+    height: 230,
+    borderRadius: 115,
     justifyContent: "center",
     alignItems: "center",
-  },
-  innerImageCard: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 10,
-  },
-  mainImage: {
-    width: "85%",
-    height: "85%",
   },
   infoSection: {
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     marginTop: 30,
-    marginBottom: 15,
+    marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  bitternessTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  selectorSection: {
-    alignItems: "center",
-    width: "100%",
-    marginBottom: 40,
-  },
+  sectionTitle: { fontFamily: "serif", fontSize: 24, fontWeight: "700" },
+  bitternessTitle: { fontSize: 18, fontWeight: "800" },
+  selectorSection: { alignItems: "center", width: "100%", marginBottom: 36 },
   pillContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     width: 260,
-    height: 70,
-    borderRadius: 35,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 1,
     paddingHorizontal: 8,
   },
   beanCircle: {
@@ -709,34 +624,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  beanCircleActive: {
-    shadowColor: "#F0CEAB",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 8,
-  },
   labelsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    width: 230,
+    width: 236,
     marginTop: 10,
   },
   labelText: {
     fontSize: 14,
     fontWeight: "700",
     textAlign: "center",
-    width: 60,
+    width: 64,
   },
-  continueButton: {
-    width: 260,
-    height: 55,
-    borderRadius: 20,
-    justifyContent: "center",
+  continueWrap: { width: 280 },
+  replayLink: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
   },
-  continueButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
+  replayText: { fontSize: 14, fontWeight: "600" },
 });

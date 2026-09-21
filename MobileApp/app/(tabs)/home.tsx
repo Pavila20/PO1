@@ -1,7 +1,6 @@
 // app/(tabs)/home.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
   Camera,
@@ -10,7 +9,6 @@ import {
   LogOut,
   Moon,
   Plus,
-  Sparkles,
   Sun,
   Thermometer,
   Trash2,
@@ -39,13 +37,18 @@ import {
   Accent,
   Glass,
   Gradients,
-  Lilac,
+  Latte,
   Motion,
   Orbs,
   Pop,
   Radii,
   SoftShadow,
 } from "../../src/constants/DesignSystem";
+import BeanBackground from "../../src/components/BeanBackground";
+import { MachineIcon } from "../../src/components/icons/CoffeeIcons";
+import { AVATARS, Avatar } from "../../src/components/icons/AnimalAvatars";
+import HeartCupIcon from "../../src/components/HeartCupIcon";
+import RecipeIcon from "../../src/components/icons/RecipeIcon";
 import { getMachineStatus } from "../../src/backend/api/machine";
 import { getSessionUser, signOutLocal } from "../../src/backend/auth/session";
 
@@ -55,13 +58,6 @@ import {
   getUserRecentBrews,
 } from "../../src/backend/api/database";
 
-const PROFILE_OPTIONS = [
-  { id: "default", src: require("../../assets/images/dino.png") },
-  { id: "avatar2", src: require("../../assets/images/chicken.png") },
-  { id: "avatar3", src: require("../../assets/images/panda.png") },
-  { id: "avatar4", src: require("../../assets/images/giraffe.png") },
-  { id: "avatar5", src: require("../../assets/images/penguin.png") },
-];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -71,13 +67,13 @@ export default function HomeScreen() {
   const glass = isDark ? Glass.dark : Glass.light;
   const accent = isDark ? Accent.dark : Accent.light;
   const pop = isDark ? Pop.dark : Pop.light;
-  const lilac = isDark ? Lilac.dark : Lilac.light;
-  const orbOpacity = isDark ? Orbs.dark.opacity : Orbs.light.opacity;
+  const latte = isDark ? Latte.dark : Latte.light;
+  const beanOpacity = isDark ? Orbs.dark.opacity : Orbs.light.opacity;
 
   const [firstName, setFirstName] = useState("There");
   const [greeting, setGreeting] = useState("Good Morning");
   const [emoji, setEmoji] = useState("☕");
-  const [profilePic, setProfilePic] = useState(PROFILE_OPTIONS[0].src);
+  const [profilePicId, setProfilePicId] = useState(AVATARS[0].id);
   const [isMenuVisible, setMenuVisible] = useState(false);
   const [isPicModalVisible, setPicModalVisible] = useState(false);
 
@@ -119,8 +115,8 @@ export default function HomeScreen() {
       }
       const savedPicId = await AsyncStorage.getItem("user_profile_pic");
       if (savedPicId) {
-        const foundPic = PROFILE_OPTIONS.find((p) => p.id === savedPicId);
-        if (foundPic) setProfilePic(foundPic.src);
+        const foundPic = AVATARS.find((p) => p.id === savedPicId);
+        if (foundPic) setProfilePicId(foundPic.id);
       }
     };
     loadUserData();
@@ -196,10 +192,8 @@ export default function HomeScreen() {
     setPicModalVisible(true);
   };
 
-  const selectNewProfilePic = async (
-    selectedOption: (typeof PROFILE_OPTIONS)[0],
-  ) => {
-    setProfilePic(selectedOption.src);
+  const selectNewProfilePic = async (selectedOption: (typeof AVATARS)[0]) => {
+    setProfilePicId(selectedOption.id);
     setPicModalVisible(false);
     await AsyncStorage.setItem("user_profile_pic", selectedOption.id);
   };
@@ -258,72 +252,8 @@ export default function HomeScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <LinearGradient colors={g.screen} style={{ flex: 1 }}>
-        {/* Decorative glow orbs - drifting slowly to keep the background alive */}
-        <View style={styles.orbLayer} pointerEvents="none">
-          <MotiView
-            from={{ translateY: 0, scale: 1 }}
-            animate={{ translateY: 18, scale: 1.08 }}
-            transition={{
-              type: "timing",
-              duration: 7000,
-              loop: true,
-              repeatReverse: true,
-            }}
-            style={[
-              styles.orb,
-              {
-                backgroundColor: pop,
-                opacity: orbOpacity,
-                width: 260,
-                height: 260,
-                top: -70,
-                right: -60,
-              },
-            ]}
-          />
-          <MotiView
-            from={{ translateY: 0, scale: 1 }}
-            animate={{ translateY: -22, scale: 1.05 }}
-            transition={{
-              type: "timing",
-              duration: 9000,
-              loop: true,
-              repeatReverse: true,
-            }}
-            style={[
-              styles.orb,
-              {
-                backgroundColor: accent,
-                opacity: orbOpacity * 0.75,
-                width: 220,
-                height: 220,
-                top: 240,
-                left: -80,
-              },
-            ]}
-          />
-          <MotiView
-            from={{ translateX: 0 }}
-            animate={{ translateX: 16 }}
-            transition={{
-              type: "timing",
-              duration: 8000,
-              loop: true,
-              repeatReverse: true,
-            }}
-            style={[
-              styles.orb,
-              {
-                backgroundColor: lilac,
-                opacity: orbOpacity * 0.7,
-                width: 200,
-                height: 200,
-                top: 520,
-                right: -70,
-              },
-            ]}
-          />
-        </View>
+        {/* Drifting coffee beans behind the content */}
+        <BeanBackground colors={[pop, latte, accent]} opacity={beanOpacity} />
 
         <SafeAreaView style={styles.container} edges={["top"]}>
           <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
@@ -421,25 +351,20 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.picGrid}>
-                  {PROFILE_OPTIONS.map((option) => (
+                  {AVATARS.map((option) => (
                     <TouchableOpacity
                       key={option.id}
                       style={[
                         styles.picOption,
                         {
-                          backgroundColor: colors.card,
                           borderColor:
-                            profilePic === option.src ? accent : "transparent",
+                            profilePicId === option.id ? pop : "transparent",
                         },
                       ]}
                       onPress={() => selectNewProfilePic(option)}
                       activeOpacity={0.8}
                     >
-                      <Image
-                        source={option.src}
-                        style={styles.picOptionImage}
-                        contentFit="contain"
-                      />
+                      <Avatar id={option.id} size={72} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -463,13 +388,6 @@ export default function HomeScreen() {
                     <Text style={[styles.greetingName, { color: colors.text }]}>
                       Hi, {firstName} {emoji}
                     </Text>
-                    <MotiView
-                      from={{ scale: 0.7, rotate: "-12deg" }}
-                      animate={{ scale: 1, rotate: "0deg" }}
-                      transition={{ ...Motion.spring, delay: 300 }}
-                    >
-                      <Sparkles size={18} color={pop} />
-                    </MotiView>
                   </View>
                   <Text style={[styles.greetingTime, { color: colors.text }]}>
                     {greeting}
@@ -492,21 +410,9 @@ export default function HomeScreen() {
                 activeOpacity={0.8}
                 onPress={() => setMenuVisible(true)}
               >
-                <Image
-                  source={profilePic}
-                  style={styles.profileImage}
-                  contentFit="cover"
-                />
+                <Avatar id={profilePicId} size={48} />
               </TouchableOpacity>
             </MotiView>
-
-            {/* TEMP: BLE test entry point, kept as ongoing debug tooling */}
-            <TouchableOpacity
-              style={styles.bleDevButton}
-              onPress={() => router.push("/ble-test")}
-            >
-              <Text style={styles.bleDevButtonText}>BLE Test (dev)</Text>
-            </TouchableOpacity>
 
             <MotiView
               from={{ opacity: 0, scale: 0.94 }}
@@ -531,49 +437,48 @@ export default function HomeScreen() {
                   </View>
 
                   <View style={styles.machineContent}>
-                    <Image
-                      source={require("../../assets/images/PO1.png")}
-                      style={styles.machineImage}
-                      contentFit="contain"
-                    />
+                    <View style={styles.machineCircle}>
+                      <MachineIcon size={112} />
+                    </View>
 
-                    <View style={{ flex: 1, gap: 10 }}>
-                      <MotiView
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: "rgba(255,255,255,0.18)" },
-                        ]}
-                        animate={
-                          isBrewing
-                            ? { opacity: [1, 0.6, 1] }
-                            : { opacity: 1 }
-                        }
-                        transition={
-                          isBrewing
-                            ? {
-                                type: "timing",
-                                duration: 1200,
-                                loop: true,
-                              }
-                            : undefined
-                        }
-                      >
-                        <View
-                          style={[styles.statusDot, { backgroundColor: statusColor }]}
-                        />
-                        <Text style={styles.statusText}>{statusText}</Text>
-                      </MotiView>
-
-                      {isConnected && (
-                        <View style={styles.tempChip}>
-                          <Thermometer size={14} color="rgba(255,255,255,0.9)" />
-                          <Text style={styles.tempChipText}>
-                            {machineData?.boilerTemp ?? "--"}°
-                          </Text>
-                        </View>
-                      )}
+                    <View style={styles.statTiles}>
+                      <View style={styles.statTile}>
+                        <Thermometer size={18} color="#fff" />
+                        <Text style={styles.statValue}>
+                          {isConnected && machineData?.boilerTemp != null
+                            ? `${machineData.boilerTemp}°F`
+                            : "--"}
+                        </Text>
+                        <Text style={styles.statLabel}>Water temp</Text>
+                      </View>
+                      <View style={styles.statTile}>
+                        <Coffee size={18} color="#fff" />
+                        <Text style={styles.statValue}>
+                          {!isConnected
+                            ? "--"
+                            : machineData?.cupPresent === false
+                              ? "No"
+                              : "Yes"}
+                        </Text>
+                        <Text style={styles.statLabel}>Cup</Text>
+                      </View>
                     </View>
                   </View>
+
+                  <MotiView
+                    style={styles.statusBadge}
+                    animate={isBrewing ? { opacity: [1, 0.6, 1] } : { opacity: 1 }}
+                    transition={
+                      isBrewing
+                        ? { type: "timing", duration: 1200, loop: true }
+                        : undefined
+                    }
+                  >
+                    <View
+                      style={[styles.statusDot, { backgroundColor: statusColor }]}
+                    />
+                    <Text style={styles.statusText}>{statusText}</Text>
+                  </MotiView>
                 </LinearGradient>
               </TouchableOpacity>
             </MotiView>
@@ -664,11 +569,9 @@ export default function HomeScreen() {
                       onPress={() => router.push("/create-recipe")}
                       activeOpacity={0.8}
                     >
-                      <Image
-                        source={require("../../assets/images/MorningCoffeeIcon.png")}
-                        style={{ width: 72, height: 72, marginBottom: 14 }}
-                        contentFit="contain"
-                      />
+                      <View style={{ marginBottom: 12 }}>
+                        <HeartCupIcon width={92} />
+                      </View>
                       <Text
                         style={{
                           color: colors.text,
@@ -729,11 +632,9 @@ export default function HomeScreen() {
                           }
                         >
                           <View style={styles.recipeRow}>
-                            <Image
-                              source={require("../../assets/images/MorningCoffeeIcon.png")}
-                              style={styles.recipeImage}
-                              contentFit="contain"
-                            />
+                            <View style={styles.recipeImage}>
+                              <RecipeIcon name={recipe.name} size={42} />
+                            </View>
                             <View style={styles.recipeInfo}>
                               <Text
                                 style={[
@@ -851,7 +752,7 @@ export default function HomeScreen() {
                                 { color: pop },
                               ]}
                             >
-                              {brew.rating}/15
+                              {brew.rating}/20
                             </Text>
                           </View>
 
@@ -888,8 +789,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  orbLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  orb: { position: "absolute", borderRadius: 9999 },
   greetingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   tasteChip: {
@@ -1021,7 +920,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     overflow: "hidden",
   },
-  picOptionImage: { width: "100%", height: "100%" },
   scrollContent: { paddingHorizontal: 21, paddingBottom: 150, gap: 24 },
   header: {
     flexDirection: "row",
@@ -1043,38 +941,69 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     overflow: "hidden",
   },
-  profileImage: { width: "100%", height: "100%" },
   widgetContainer: { borderRadius: Radii.lg, padding: 20, gap: 16 },
   widgetHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  widgetTitle: { fontSize: 18, fontWeight: "800", color: "#fff" },
+  widgetTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#fff",
+    textShadowColor: "rgba(120,70,55,0.35)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
   machineContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 14,
   },
-  machineImage: { width: 90, height: 108 },
+  machineCircle: {
+    width: 136,
+    height: 136,
+    borderRadius: 68,
+    backgroundColor: "rgba(255,255,255,0.28)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statTiles: { flex: 1, flexDirection: "row", gap: 10 },
+  statTile: {
+    flex: 1,
+    height: 120,
+    borderRadius: Radii.md,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  statValue: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+    textShadowColor: "rgba(120,70,55,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  statLabel: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "600" },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
-    alignSelf: "flex-start",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 11,
     borderRadius: Radii.pill,
+    backgroundColor: "rgba(255,255,255,0.22)",
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  tempChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
+  statusDot: { width: 9, height: 9, borderRadius: 5 },
+  statusText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    textShadowColor: "rgba(120,70,55,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  tempChipText: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: "600" },
   sectionContainer: { gap: 12 },
   sectionTitle: { fontSize: 21, fontWeight: "700" },
   recipeHeader: {
@@ -1094,10 +1023,12 @@ const styles = StyleSheet.create({
   recipeCard: { borderRadius: Radii.md, padding: 16, borderWidth: 1 },
   recipeRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   recipeImage: {
-    width: 55,
-    height: 55,
+    width: 58,
+    height: 58,
     borderRadius: Radii.sm,
-    backgroundColor: "#d19a6a",
+    backgroundColor: "rgba(255,188,218,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   recipeInfo: { flex: 1, gap: 2 },
   recipeTitle: { fontSize: 16, fontWeight: "600" },
@@ -1116,13 +1047,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  bleDevButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#333",
-    marginTop: -12,
-  },
-  bleDevButtonText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 });

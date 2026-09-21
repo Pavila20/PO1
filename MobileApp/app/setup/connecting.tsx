@@ -1,15 +1,11 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { getMachineStatus } from "../../src/backend/api/machine";
+import { GradientButton } from "../../src/components/auth/AuthControls";
+import MachineHero from "../../src/components/setup/MachineHero";
+import SetupScreen from "../../src/components/setup/SetupScreen";
 
 export default function SetupConnecting() {
   const router = useRouter();
@@ -39,86 +35,38 @@ export default function SetupConnecting() {
   }, []);
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <View style={styles.content}>
-        {isConnecting ? (
-          <>
-            <ActivityIndicator
-              size="large"
-              color={colors.primaryButton}
-              style={{ marginBottom: 30 }}
-            />
-            <Text style={[styles.title, { color: colors.text }]}>
-              Connecting...
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.subtext }]}>
-              Just a moment more, please.
-            </Text>
-          </>
-        ) : connectionFailed ? (
-          <>
-            <Text style={[styles.title, { color: "red" }]}>
-              Connection Failed
-            </Text>
-            <Text
-              style={[
-                styles.subtitle,
-                { color: colors.subtext, marginBottom: 20 },
-              ]}
-            >
-              We couldn't reach the machine. Make sure you are on the same Wi-Fi
-              network.
-            </Text>
-
-            {/* NEW RETRY BUTTON */}
-            <TouchableOpacity
+    <SetupScreen
+      step={3}
+      title={connectionFailed ? "Connection failed" : "Connecting..."}
+      subtitle={
+        connectionFailed
+          ? "We couldn't reach the machine. Make sure it's powered on and nearby."
+          : "Just a moment more, please."
+      }
+      hero={<MachineHero mode={isConnecting ? "searching" : "failed"} />}
+      footer={
+        <>
+          {connectionFailed && (
+            <GradientButton
+              label="Retry connection"
               onPress={attemptConnection}
-              style={[
-                styles.retryButton,
-                { backgroundColor: colors.primaryButton },
-              ]}
-            >
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>
-                Retry Connection
-              </Text>
-            </TouchableOpacity>
-          </>
-        ) : null}
-      </View>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          onPress={() => router.replace("/(tabs)/home")}
-          style={styles.cancelButton}
-        >
-          <Text style={[styles.cancelText, { color: colors.subtext }]}>
-            Cancel
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+            />
+          )}
+          <TouchableOpacity
+            onPress={() => router.replace("/(tabs)/home")}
+            style={styles.cancelButton}
+          >
+            <Text style={[styles.cancelText, { color: colors.subtext }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24 },
-  content: { flex: 1, justifyContent: "center", alignItems: "center" },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  subtitle: { fontSize: 16, textAlign: "center" },
-  footer: { marginBottom: 20 },
   cancelButton: { alignItems: "center", padding: 10 },
   cancelText: { fontSize: 16 },
-  retryButton: {
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    width: "80%",
-  },
 });
