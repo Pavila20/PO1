@@ -32,11 +32,18 @@
 #include <OneWire.h> // Dallas OneWire Communication Protocol
 #include <DallasTemperature.h> // Dallas DS18B20 Temperature Sensor Interfacing Protocol
 
+// App communication over Bluetooth - same approach as PO1_Hardware_BLE_Test
+// (standalone BLE proof-of-concept) in the MobileApp repo.
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+#include <ArduinoJson.h>
+
 // USE THIS OR REST API??
 // You'll need to add these libraries to your includes at the top:
 // #include <WebServer.h>
 // #include <WebSocketsServer.h>
-// #include <ArduinoJson.h>
 
 //======================================================================================
 // GPIO PIN CONFIGURATION
@@ -71,6 +78,7 @@ unsigned long int StateChangeTime = 0;    // Initialize Time Tracking for States
 // TARGET VALUES
 unsigned int bean_weight_diff     = 0; // Target weight for grinding (current weight - target weight)
 unsigned int water_temp           = 0; // Target temperature for heating water
+unsigned int water_weight         = 0; // Target water weight, staged from the app's SET_RECIPE command
 unsigned int flow_rate            = 0; // Target flow rate for pumping water (mL/sec)
 
 // CYCLE TRACKING
@@ -143,10 +151,18 @@ unsigned long LastFlowMeasureTime     = 0;      // Last time flow was measured
 unsigned long LastFlowPulseCount      = 0;       // Pulse count at last measurement
 const float FLOW_SENSOR_CALIBRATION   = 0.6;  // YF201 pulses per mL (adjust based on calibration)
 
+// DISPENSE / SHOWERHEAD LIMITS
+const float SHOWERHEAD_CAPACITY_ML = 45.0;
+const unsigned long SHOWERHEAD_DRAIN_TIME_MS = 10000;
+const unsigned long BLOOM_SOAK_TIME_MS = 45000;
+const unsigned long PAUSE_BETWEEN_POURS_MS = 30000;
+const unsigned long FILL_FLOW_TIMEOUT_MS = 60000;
+const unsigned long FLOW_START_TIMEOUT_MS = 5000;
+
 // APP COMMUNICATION
 struct RecipeData {
     unsigned int TargetBeanWeight  =  25;  // grams
-    unsigned int TargetWaterTemp   =  50;   // °C
+    unsigned int TargetWaterTemp   =  35;   // °C
     unsigned int TargetWaterWeight = 150; // mL
     unsigned int TargetFlowRate;    // mL/sec
 };
@@ -189,7 +205,7 @@ const int SERVER_PORT     = 80;
 
 // YF201 Flow Sensor ISR - counts pulses from turbine
 void IRAM_ATTR FlowSensorISR() {
-    FlowPulseCount++;
+    FlowPulseCount = FlowPulseCount + 1;
 }
 
 // Calculate flow rate from pulse count
@@ -226,137 +242,191 @@ enum MachineStates{ // !!!!WRITE COMMENTS!!!!
     ERROR           // Handle errors, monitor for acknowledgment and shutdown
 };
 
-MachineStates CurrentState = DISPENSE; // Initialize in IDLE
+MachineStates CurrentState = IDLE; // Initialize in IDLE
 
-/*void HandleIDLE(){
-    if (StateFlags.GENERAL_Initialized == false){
-        if (StateFlags.IDLE_SystemReady == false) {
-            // Boot sequence - test actuators and sensors
-            if (BootStep == 0) { // Test Motor
-                digitalWrite(MOTOR_DRIVER_PIN, HIGH);
-                delay(100);
-                digitalWrite(MOTOR_DRIVER_PIN, LOW);
-                BootStep++;
-                BootRetries = 0;
-            }
-            else if (BootStep == 1) { // Test Pump1
-                digitalWrite(PUMP_1_PIN, HIGH);
-                delay(100);
-                digitalWrite(PUMP_1_PIN, LOW);
-                BootStep++;
-                BootRetries = 0;
-            }
-            else if (BootStep == 2) { // Test Pump2
-                digitalWrite(PUMP_2_PIN, HIGH);
-                delay(100);
-                digitalWrite(PUMP_2_PIN, LOW);
-                BootStep++;
-                BootRetries = 0;
-            }
-            else if (BootStep == 3) { // Test Heater
-                digitalWrite(HEATER_PIN, HIGH);
-                delay(100);
-                digitalWrite(HEATER_PIN, LOW);
-                BootStep++;
-                BootRetries = 0;
-            }
-            else if (BootStep == 4) { // Test Solenoid
-                digitalWrite(SOLENOID_PIN, HIGH);
-                delay(100);
-                digitalWrite(SOLENOID_PIN, LOW);
-                BootStep++;
-                BootRetries = 0;
-            }
-            else if (BootStep == 5) { // Read LoadCellBeans
-                CurrentWeightBeans = LoadCellBeans.get_units();
-                if (CurrentWeightBeans > -1000 && CurrentWeightBeans < 1000) {
-                    BootStep++;
-                    BootRetries = 0;
-                } else {
-                    BootRetries++;
-                    if (BootRetries > MAX_BOOT_RETRIES) {
-                        CurrentState = ERROR;
-                        StateFlags.IDLE_SystemReady = true;
-                    }
-                }
-            }
-            else if (BootStep == 6) { // Calibrate LoadCellBeans
-                CalibrationFactorBeans = 1.0;
-                BootStep++;
-                BootRetries = 0;
-            }
-            else if (BootStep == 7) { // Read LoadCellWater
-                CurrentWeightWater = LoadCellWater.get_units();
-                if (CurrentWeightWater > -1000 && CurrentWeightWater < 2000) {
-                    BootStep++;
-                    BootRetries = 0;
-                } else {
-                    BootRetries++;
-                    if (BootRetries > MAX_BOOT_RETRIES) {
-                        CurrentState = ERROR;
-                        StateFlags.IDLE_SystemReady = true;
-                    }
-                }
-            }
-            else if (BootStep == 8) { // Calibrate LoadCellWater
-                CalibrationFactorWater = 1.0;
-                BootStep++;
-                BootRetries = 0;
-            }
-            else if (BootStep == 9) { // Read TempSensor
-                TempSensor.requestTemperatures();
-                CurrentTemperature = TempSensor.getTempCByIndex(0);
-                if (CurrentTemperature > -50 && CurrentTemperature < 150) {
-                    BootStep++;
-                    BootRetries = 0;
-                } else {
-                    BootRetries++;
-                    if (BootRetries > MAX_BOOT_RETRIES) {
-                        CurrentState = ERROR;
-                        StateFlags.IDLE_SystemReady = true;
-                    }
-                }
-            }
-            else if (BootStep == 10) { // All tests passed
-                StateFlags.IDLE_SystemReady = true;
-                StateFlags.GENERAL_Initialized = true;
-                BootStep = 0;
-                BootRetries = 0;
-            }
-            
-            // Check boot timeout
-            if (millis() - StateStartTime > 60000) {
-                CurrentState = ERROR;
-                StateFlags.IDLE_SystemReady = true;
-            }
-        }
+// The dispenser fills the showerhead in 45 mL-or-smaller batches, then lets it drain.
+enum DispensePhase {
+    DISPENSE_BLOOM,
+    DISPENSE_FILL_SHOWERHEAD,
+    DISPENSE_DRAIN_SHOWERHEAD,
+    DISPENSE_BLOOM_SOAK,
+    DISPENSE_PAUSE_BETWEEN_POURS,
+    DISPENSE_COMPLETE
+};
+
+DispensePhase CurrentDispensePhase = DISPENSE_BLOOM;
+unsigned int CurrentPour = 0;  // 0 = bloom, 1-4 = regular pours
+float TotalDispenseTargetML = 0.0;
+float BloomTargetML = 37.5;
+float PourTargetML = 0.0;
+float CurrentPourTargetML = 0.0;
+float CurrentPourDispensedML = 0.0;
+float CurrentFillTargetML = 0.0;
+unsigned long FillStartPulseCount = 0;
+unsigned long DispensePhaseStartTime = 0;
+
+//======================================================================================
+// BLE COMMUNICATION (app <-> machine)
+//======================================================================================
+// Same device name + UUIDs as the BLE test rig in the MobileApp repo
+// (PO1_Hardware_BLE_Test/src/main.cpp), so the app connects with no changes
+// on its side.
+#define BLE_SERVICE_UUID      "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+#define BLE_STATUS_CHAR_UUID  "6e400003-b5a3-f393-e0a9-e50e24dcca9e" // NOTIFY: machine -> app
+#define BLE_COMMAND_CHAR_UUID "6e400002-b5a3-f393-e0a9-e50e24dcca9e" // WRITE:  app -> machine
+
+BLEServer *pBleServer = nullptr;
+BLECharacteristic *pBleStatusChar = nullptr;
+BLECharacteristic *pBleCommandChar = nullptr;
+
+// IMPORTANT: BLE callbacks (onWrite/onConnect/onDisconnect) run on the
+// Bluetooth stack's own task, which has a small fixed stack. Calling
+// notify()/startAdvertising() directly from inside a callback can overflow
+// that stack and crash the board (confirmed on the BLE test rig). These
+// flags let the callbacks just record "something happened" - the real BLE
+// work happens in loop(), which runs on the main task with a much bigger
+// stack.
+volatile bool BleStatusUpdatePending = false;
+volatile bool BleAdvertisingRestartPending = false;
+
+class BleServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer *server) override {
+    Serial.println("[BLE] App connected");
+  }
+  void onDisconnect(BLEServer *server) override {
+    Serial.println("[BLE] App disconnected");
+    BleAdvertisingRestartPending = true; // so the app/dashboard can reconnect
+  }
+};
+
+class BleCommandCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *characteristic) override {
+    String value = String(characteristic->getValue().c_str());
+    Serial.print("[BLE] Command received: ");
+    Serial.println(value);
+
+    if (value.startsWith("{")) {
+      // SET_RECIPE payload from sendRecipeToMachine() in the app's
+      // machine.ts, e.g. {"cmd":"SET_RECIPE","tempC":92,"beanWeight":25,"waterWeight":150}
+      StaticJsonDocument<128> doc;
+      if (deserializeJson(doc, value) == DeserializationError::Ok &&
+          doc["cmd"] == "SET_RECIPE") {
+        water_temp = doc["tempC"] | water_temp;
+        bean_weight_diff = doc["beanWeight"] | bean_weight_diff;
+        water_weight = doc["waterWeight"] | water_weight;
+        RecipeReceived = true;
+      }
+    } else if (value == "START_GRIND") {
+      // Sent when the app's "Continue to Brew" is tapped on the grinder
+      // screen. Satisfies the gate in HandleGRIND() below.
+      StartCommandReceived = true;
+    } else if (value == "START_DISPENSE") {
+      // Sent when the app's "Continue to Brew" is tapped on the "Move
+      // Filtered Cup" screen - that tap IS the cup-moved-to-dispenser
+      // confirmation, so this satisfies the gate in HandleUSER_PROMPT()
+      // below (not a separate "cup moved" command - the app only ever
+      // sends this one at that point in the flow).
+      UserAcknowledgmentReceived = true;
+    } else if (value == "EMERGENCY_STOP") {
+      // NOTE: this only sets the flag for now. HandleERROR() is marked
+      // "NOT CORRECT CURRENTLY" and its case in loop() is still commented
+      // out, so this does not yet force actuators off or change state -
+      // that needs HandleERROR() finished and enabled first.
+      EmergencyStopReceived = true;
     }
-    else {
-        // Already initialized - ready state
-        // Ensure all actuators are OFF (safe state)
-        digitalWrite(MOTOR_DRIVER_PIN, LOW);
-        digitalWrite(PUMP_1_PIN, LOW);
-        digitalWrite(PUMP_2_PIN, LOW);
-        digitalWrite(HEATER_PIN, LOW);
-        digitalWrite(SOLENOID_PIN, LOW);
-        
-        // Wait for recipe from app
-        if (RecipeReceived == true){
-            CurrentRecipe.TargetBeanWeight = bean_weight_diff;
-            CurrentRecipe.TargetWaterTemp = water_temp;
-            CurrentRecipe.TargetWaterWeight = 0;
-            CurrentRecipe.TargetFlowRate = flow_rate;
-            
-            CurrentState = GRIND;
-            StateStartTime = millis();
-            memset(&StateFlags, 0, sizeof(StateFlags));
-            RecipeReceived = false;
-        }
+
+    BleStatusUpdatePending = true;
+  }
+};
+
+// Turns the current MachineStates enum value into the string the app
+// expects in its "status" field.
+const char *BleStateName(MachineStates state) {
+  switch (state) {
+    case IDLE: return "IDLE";
+    case GRIND: return "GRIND";
+    case USER_PROMPT: return "USER_PROMPT";
+    case PUMP: return "PUMP";
+    case HEAT: return "HEAT";
+    case DISPENSE: return "DISPENSE";
+    case ERROR: return "ERROR";
+  }
+  return "UNKNOWN";
+}
+
+void BleSendStatusUpdate() {
+  StaticJsonDocument<256> doc;
+  doc["status"] = BleStateName(CurrentState);
+  // DS18B20 reads Celsius; the app's screens are labelled "°F".
+  doc["boilerTemp"] = (int)round(CurrentTemperature * 9.0 / 5.0 + 32.0);
+  // No cup/tank sensors on this build yet - intentionally omitted rather
+  // than faked. The app treats a missing cupPresent as "cup present".
+
+  String json;
+  serializeJson(doc, json);
+
+  pBleStatusChar->setValue(json.c_str());
+  pBleStatusChar->notify();
+}
+
+void BleSetup() {
+  BLEDevice::init("PourOver1-BLE-Test"); // must match exactly - the app scans for this name
+  pBleServer = BLEDevice::createServer();
+  pBleServer->setCallbacks(new BleServerCallbacks());
+
+  BLEService *pService = pBleServer->createService(BLE_SERVICE_UUID);
+
+  pBleStatusChar = pService->createCharacteristic(
+      BLE_STATUS_CHAR_UUID,
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  pBleStatusChar->addDescriptor(new BLE2902());
+
+  pBleCommandChar = pService->createCharacteristic(
+      BLE_COMMAND_CHAR_UUID, BLECharacteristic::PROPERTY_WRITE);
+  pBleCommandChar->setCallbacks(new BleCommandCallbacks());
+
+  pService->start();
+
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(BLE_SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  BLEDevice::startAdvertising();
+
+  Serial.println("[BLE] Advertising as 'PourOver1-BLE-Test'");
+}
+
+// Replaces the boot-self-test HandleIDLE() that used to live here
+// (commented out) - it referenced hardware that isn't in this version of
+// the file any more (MOTOR_DRIVER_PIN, a single LoadCellBeans/
+// CalibrationFactorBeans, and a LoadCellWater/CalibrationFactorWater -
+// water is measured by the flow sensor now, not a load cell). Rebuilding a
+// boot self-test is worth doing once the water-sensing hardware is
+// settled; this just waits for the app's recipe, same as the old one did
+// in its "already initialized" branch.
+void HandleIDLE(){
+    // Safe state while we wait for the app to send a recipe.
+    digitalWrite(MOTOR_PWM_PIN, LOW);
+    digitalWrite(PUMP_1_PIN, LOW);
+    digitalWrite(PUMP_2_PIN, LOW);
+    digitalWrite(HEATER_PIN, LOW);
+    digitalWrite(SOLENOID_PIN, LOW);
+
+    if (RecipeReceived) {
+        CurrentRecipe.TargetBeanWeight = bean_weight_diff;
+        CurrentRecipe.TargetWaterTemp = water_temp;
+        CurrentRecipe.TargetWaterWeight = water_weight;
+        CurrentRecipe.TargetFlowRate = flow_rate;
+        RecipeReceived = false;
+
+        Serial.println("[IDLE] Recipe received, moving to GRIND");
+        CurrentState = GRIND;
+        StateStartTime = millis();
+        memset(&StateFlags, 0, sizeof(StateFlags));
     }
 }
-*/
+
 void HandleTARE(){
-    delay(60000);
+    delay(5000);
     LoadCellBeans_1.begin(DOUT_1, CLK_1);
     LoadCellBeans_2.begin(DOUT_2, CLK_2);
 
@@ -377,7 +447,6 @@ void HandleTARE(){
         for (int i = 1; i < 26; i++){
             long reading_1 = LoadCellBeans_1.read();
             long reading_2 = LoadCellBeans_2.read();
-            
             sum_1 += reading_1;
             sum_2 += reading_2;
             delay(200);
@@ -396,6 +465,7 @@ void HandleTARE(){
     Serial.print("HX711_2 CF: ");
     Serial.println(Offset_2);
 }
+
 void HandleGRIND(){
     // PHASE 1: Wait for container to be placed on scale
     if (StateFlags.GENERAL_Initialized == false){ // First run this state
@@ -410,14 +480,21 @@ void HandleGRIND(){
     
     // PHASE 2: Wait for user confirmation, then measure initial weight and start motor
     if (StateFlags.GRIND_WeightMeasured == false) {
+        bool confirmed = false;
         if (Serial.available()) {
             char input = Serial.read();
-            if (input == 's' || input == 'S') {
+            if (input == 's' || input == 'S') confirmed = true;
+        }
+        if (StartCommandReceived) {   // set by onWrite() for the app's "START_GRIND"
+            StartCommandReceived = false;
+            confirmed = true;
+        }
+        if (confirmed) {
                 Serial.println("[GRIND] Container confirmed. Measuring initial weight...");
             
                 StateStartTime = millis();
-                InitialWeightBeans = (LoadCellBeans_1.read() - Offset_1) * CalibrationFactor_1 + 
-                                     (LoadCellBeans_2.read() - Offset_2) * CalibrationFactor_2;
+                InitialWeightBeans = (LoadCellBeans_1.read() - Offset_1) * abs(CalibrationFactor_1) + 
+                                     (LoadCellBeans_2.read() - Offset_2) * abs(CalibrationFactor_2);
                 GrindWeightBeans = InitialWeightBeans;
 
                 Serial.println("[GRIND TEST] Initial weight recorded: " + String(InitialWeightBeans)); //TEST
@@ -429,9 +506,8 @@ void HandleGRIND(){
                 Serial.println("[GRIND TEST] Motor turned ON"); //TEST
                 StateFlags.GRIND_WeightMeasured = true;
                 return;
-            }
         }
-        
+
         // Check timeout while waiting for container confirmation (5 minutes)
         if (millis() - StateStartTime > 300000) {
             Serial.println("[GRIND] TIMEOUT waiting for container confirmation");
@@ -500,6 +576,7 @@ void HandleGRIND(){
         }
     }
 }
+
 void HandleUSER_PROMPT(){
     if (StateFlags.GENERAL_Initialized == false){ // First run this state
         pinMode(PUMP_1_PIN, OUTPUT);
@@ -522,24 +599,30 @@ void HandleUSER_PROMPT(){
     
     // PHASE 1: Wait for user confirmation
     if (StateFlags.USER_PromptAcknowledged == false) {
+        bool cupConfirmed = false;
         // Check for serial input
         if (Serial.available()) {
             char input = Serial.read();
-            if (input == 'c' || input == 'C') {
-                StateFlags.USER_PromptAcknowledged = true;
-                
-                // Start PUMP_1 (fill boiler)
-                digitalWrite(PUMP_1_PIN, HIGH);
-                Serial.println("[USER_PROMPT] Container confirmed. Pump started - filling boiler...");
-                Serial.println("[USER_PROMPT] Target water weight: " + String(CurrentRecipe.TargetWaterWeight) + " mL");
-                
-                // Reset pump timer
-                StateStartTime = millis();
-                CurrentWeightWater = 0.0;
-                return;
-            }
+            if (input == 'c' || input == 'C') cupConfirmed = true;
         }
-        
+        if (UserAcknowledgmentReceived) {   // set by onWrite() for the app's "START_DISPENSE"
+            UserAcknowledgmentReceived = false;
+            cupConfirmed = true;
+        }
+        if (cupConfirmed) {
+            StateFlags.USER_PromptAcknowledged = true;
+
+            // Start PUMP_1 (fill boiler)
+            digitalWrite(PUMP_1_PIN, HIGH);
+            Serial.println("[USER_PROMPT] Container confirmed. Pump started - filling boiler...");
+            Serial.println("[USER_PROMPT] Target water weight: " + String(CurrentRecipe.TargetWaterWeight) + " mL");
+
+            // Reset pump timer
+            StateStartTime = millis();
+            CurrentWeightWater = 0.0;
+            return;
+        }
+
         // Check for timeout waiting for confirmation
         if (millis() - StateStartTime > StateDuration){
             StateFlags.USER_TimeoutOccurred = true;
@@ -618,6 +701,7 @@ void HandleUSER_PROMPT(){
         return;
     }
 }
+
 void HandleHEAT(){
     if (StateFlags.GENERAL_Initialized == false){ // First run this state
         digitalWrite(HEATER_PIN, HIGH);  // Turn heater ON
@@ -665,176 +749,211 @@ void HandleHEAT(){
         return;
     }
 }
+
+void StartShowerheadFill(float requestedVolumeML) {
+    CurrentFillTargetML = requestedVolumeML > SHOWERHEAD_CAPACITY_ML
+                              ? SHOWERHEAD_CAPACITY_ML
+                              : requestedVolumeML;
+    FillStartPulseCount = FlowPulseCount;
+    DispensePhaseStartTime = millis();
+    CurrentDispensePhase = DISPENSE_FILL_SHOWERHEAD;
+
+    // Keep the valve open while pumping. It stays open during the subsequent drain.
+    digitalWrite(SOLENOID_PIN, HIGH);
+    digitalWrite(PUMP_2_PIN, HIGH);
+}
+void StopDispenseWithError(const char *message) {
+    digitalWrite(PUMP_2_PIN, LOW);
+    digitalWrite(SOLENOID_PIN, LOW);
+    detachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN_2));
+
+    StateFlags.DISPENSE_TimeoutOccurred = true;
+    StateFlags.GENERAL_Initialized = false;
+    CurrentState = ERROR;
+    StateStartTime = millis();
+    Serial.println(message);
+}
 void HandleDISPENSE(){
-
-    unsigned long elapsedTime = millis() - StateStartTime;
-    float bloomVolume = weightGround * 2;
-    float remainingVolume = CurrentWeightWater - bloomVolume;
-    float volumePerCycle = remainingVolume / 4;
-
-    if (StateFlags.GENERAL_Initialized == false){ // First run this state
+    if (StateFlags.GENERAL_Initialized == false) { // First run in this state
         pinMode(SOLENOID_PIN, OUTPUT);
         pinMode(PUMP_2_PIN, OUTPUT);
         pinMode(FLOW_SENSOR_PIN_2, INPUT_PULLUP);
-        
-        // Setup flow sensor interrupt for dispense
-        attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN_2), FlowSensorISR, RISING);
-        
-        // Reset flow tracking variables
+
         FlowPulseCount = 0;
         LastFlowPulseCount = 0;
         LastFlowMeasureTime = millis();
-        
-        digitalWrite(SOLENOID_PIN, HIGH); // Turn solenoid ON (open valve)
-        delay(500);
-        digitalWrite(PUMP_2_PIN, HIGH);   // Turn PUMP_2 ON
-        
-        StateStartTime = millis();
-        StateDuration = 270000;  // 4:30 minutes total (270 seconds)
-        
-        Serial.println("[DISPENSE] Starting bloom phase...");
-        Serial.print("[DISPENSE] Bean weight: ");
-        Serial.print(weightGround);
-        Serial.println(" g");
-        Serial.print("[DISPENSE] Bloom volume: ");
-        Serial.print(bloomVolume);
-        Serial.println(" mL");
-        Serial.print("[DISPENSE] Water available: ");
-        Serial.print(CurrentWeightWater);
-        Serial.println(" mL");
-        Serial.print("[DISPENSE] Remaining volume per cycle: ");
-        Serial.print(volumePerCycle);
-        Serial.println(" mL");
-        
-        StateFlags.GENERAL_Initialized = true;
-        return;
-    }
-    
-   
-    
-    // Time allocation: 45s bloom + 4 cycles with pauses
-    const unsigned long bloomDuration = 45000;      // 45 seconds
-    const unsigned long timePerCycle = 56250;       // ~56 seconds per cycle
-    const unsigned long pauseBetweenCycles = 30000; // 30 second pause
-    
-    // Calculate total water dispensed so far
-    float totalWaterDispensed = (float)FlowPulseCount / FLOW_SENSOR_CALIBRATION;
-    
-    // PHASE 1: BLOOM (0-45 seconds)
-    if (elapsedTime < bloomDuration) {
-        // Monitor bloom phase
-        CurrentFlowRate = CalculateFlowRate();
-        
-        Serial.print("[DISPENSE] BLOOM Phase - Elapsed: ");
-        Serial.print(elapsedTime / 1000);
-        Serial.print("s | Flow: ");
-        Serial.print(CurrentFlowRate);
-        Serial.print(" mL/s | Dispensed: ");
-        Serial.print(totalWaterDispensed);
-        Serial.print(" / ");
-        Serial.print(bloomVolume);
-        Serial.println(" mL");
-        
-        // Safety check: if bloom phase overflows
-        if (totalWaterDispensed > bloomVolume * 1.1) {
-            Serial.println("[DISPENSE] WARNING: Bloom phase exceeded target volume!");
-        }
-        return;
-    }
-    
-    // PHASES 2-5: FOUR DISPENSE CYCLES (after bloom)
-    unsigned long timeIntoCycles = elapsedTime - bloomDuration;
-    unsigned long totalCycleDuration = timePerCycle + pauseBetweenCycles;
-    
-    // Determine which cycle we're in (0-3, or 4 if all complete)
-    unsigned int currentCycle = (timeIntoCycles / totalCycleDuration) + 1;
-    unsigned long timeIntoCurrentCycle = timeIntoCycles % totalCycleDuration;
-    
-    // All cycles complete
-    if (currentCycle > 4) {
-        digitalWrite(PUMP_2_PIN, LOW);
-        digitalWrite(SOLENOID_PIN, LOW);
-        detachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN_2));
-        
-        Serial.println("[DISPENSE] ========== DISPENSE COMPLETE ==========");
-        Serial.print("[DISPENSE] Total water dispensed: ");
-        Serial.print(totalWaterDispensed);
-        Serial.println(" mL");
-        Serial.print("[DISPENSE] Total time: ");
-        Serial.print(elapsedTime / 1000);
-        Serial.println(" seconds");
-        
-        StateFlags.DISPENSE_DispensingComplete = true;
-        CurrentState = IDLE;
-        StateStartTime = millis();
-        memset(&StateFlags, 0, sizeof(StateFlags));
-        FlowPulseCount = 0;  // Reset pulse count
-        return;
-    }
-    
-    // During active dispense cycle (not pause)
-    if (timeIntoCurrentCycle < timePerCycle) {
-        CurrentFlowRate = CalculateFlowRate();
-        
-        // Calculate water dispensed in this cycle
-        // Total dispensed minus bloom and previous cycles
-        float waterInPreviousCycles = (currentCycle - 1) * volumePerCycle;
-        float waterInThisCycle = totalWaterDispensed - bloomVolume - waterInPreviousCycles;
-        
-        Serial.print("[DISPENSE] CYCLE ");
-        Serial.print(currentCycle);
-        Serial.print(" - Elapsed in cycle: ");
-        Serial.print(timeIntoCurrentCycle / 1000);
-        Serial.print("s | Flow: ");
-        Serial.print(CurrentFlowRate);
-        Serial.print(" mL/s | Cycle progress: ");
-        Serial.print(waterInThisCycle);
-        Serial.print(" / ");
-        Serial.print(volumePerCycle);
-        Serial.println(" mL");
-        
-        // Safety check: detect if flow stopped during active phase
-        if (CurrentFlowRate < 0.05 && timeIntoCurrentCycle > 5000) {
-            Serial.println("[DISPENSE] ERROR: Flow stopped during active cycle!");
-            digitalWrite(PUMP_2_PIN, LOW);
-            digitalWrite(SOLENOID_PIN, LOW);
-            detachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN_2));
-            
-            StateFlags.DISPENSE_TimeoutOccurred = true;
-            CurrentState = ERROR;
-            StateStartTime = millis();
-            memset(&StateFlags, 0, sizeof(StateFlags));
-            FlowPulseCount = 0;
+        attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN_2), FlowSensorISR, RISING);
+
+        // Prefer the requested recipe volume. The measured boiler volume is a fallback
+        // for the current standalone test configuration.
+        TotalDispenseTargetML = CurrentRecipe.TargetWaterWeight > 0
+                                    ? CurrentRecipe.TargetWaterWeight
+                                    : CurrentWeightWater;
+        if (TotalDispenseTargetML <= 0.0) {
+            StopDispenseWithError("[DISPENSE] ERROR: No target water volume available");
             return;
         }
-    } 
-    else {
-        // Pause between cycles
-        unsigned long timeIntoPause = timeIntoCurrentCycle - timePerCycle;
-        
-        Serial.print("[DISPENSE] PAUSE after cycle ");
-        Serial.print(currentCycle);
-        Serial.print(" - Elapsed: ");
-        Serial.print(timeIntoPause / 1000);
-        Serial.print("s / 30s");
-        Serial.println();
+
+        BloomTargetML = weightGround * 2.0;
+        if (BloomTargetML > TotalDispenseTargetML) {
+            BloomTargetML = TotalDispenseTargetML;
+        }
+        PourTargetML = (TotalDispenseTargetML - BloomTargetML) / 4.0;
+        CurrentPour = 0;
+        CurrentPourTargetML = BloomTargetML;
+        CurrentPourDispensedML = 0.0;
+
+        // Timeout includes a full allowed fill time and drain time for every 45 mL fill,
+        // the bloom soak, and the three rests between the four regular pours.
+        unsigned int fillCount = (unsigned int)((TotalDispenseTargetML + SHOWERHEAD_CAPACITY_ML - 0.001) /
+                                                 SHOWERHEAD_CAPACITY_ML);
+        StateDuration = (unsigned long)fillCount *
+                            (FILL_FLOW_TIMEOUT_MS + SHOWERHEAD_DRAIN_TIME_MS) +
+                        BLOOM_SOAK_TIME_MS + (3 * PAUSE_BETWEEN_POURS_MS);
+        StateStartTime = millis();
+
+        StateFlags.DISPENSE_DispensingComplete = false;
+        StateFlags.DISPENSE_TimeoutOccurred = false;
+        StateFlags.GENERAL_Initialized = true;
+
+        Serial.println("[DISPENSE] Starting volume-controlled bloom...");
+        Serial.print("[DISPENSE] Total target: ");
+        Serial.print(TotalDispenseTargetML);
+        Serial.println(" mL");
+        Serial.print("[DISPENSE] Bloom target: ");
+        Serial.print(BloomTargetML);
+        Serial.println(" mL");
+        Serial.print("[DISPENSE] Each regular pour: ");
+        Serial.print(PourTargetML);
+        Serial.println(" mL");
+
+        if (CurrentPourTargetML > 0.0) {
+            StartShowerheadFill(CurrentPourTargetML);
+        } else {
+            CurrentDispensePhase = DISPENSE_BLOOM_SOAK;
+            DispensePhaseStartTime = millis();
+        }
+        return;
     }
-    
-    // Safety timeout check (with 2 second margin)
-    if (elapsedTime > StateDuration + 2000) {
-        StateFlags.DISPENSE_TimeoutOccurred = true;
+
+    if (millis() - StateStartTime > StateDuration) {
+        StopDispenseWithError("[DISPENSE] TIMEOUT - Stopping dispense");
+        return;
+    }
+
+    if (CurrentDispensePhase == DISPENSE_FILL_SHOWERHEAD) {
+        unsigned long fillPulseCount = FlowPulseCount - FillStartPulseCount;
+        float fillVolumeML = (float)fillPulseCount / FLOW_SENSOR_CALIBRATION;
+        CurrentFlowRate = CalculateFlowRate();
+
+        if (fillVolumeML >= CurrentFillTargetML) {
+            // Stop adding water at the showerhead capacity; leave the valve open to drain.
+            digitalWrite(PUMP_2_PIN, LOW);
+            CurrentPourDispensedML += CurrentFillTargetML;
+            CurrentDispensePhase = DISPENSE_DRAIN_SHOWERHEAD;
+            DispensePhaseStartTime = millis();
+
+            Serial.print("[DISPENSE] Fill complete: ");
+            Serial.print(CurrentFillTargetML);
+            Serial.println(" mL. Draining showerhead...");
+            return;
+        }
+
+        if (millis() - DispensePhaseStartTime > FLOW_START_TIMEOUT_MS &&
+            FlowPulseCount == FillStartPulseCount) {
+            StopDispenseWithError("[DISPENSE] ERROR: No flow detected while filling showerhead");
+            return;
+        }
+
+        if (millis() - DispensePhaseStartTime > FILL_FLOW_TIMEOUT_MS) {
+            StopDispenseWithError("[DISPENSE] ERROR: Showerhead fill timed out");
+            return;
+        }
+        return;
+    }
+
+    if (CurrentDispensePhase == DISPENSE_DRAIN_SHOWERHEAD) {
+        if (millis() - DispensePhaseStartTime < SHOWERHEAD_DRAIN_TIME_MS) {
+            return;
+        }
+
+        digitalWrite(SOLENOID_PIN, LOW);
+        if (CurrentPourDispensedML + 0.01 < CurrentPourTargetML) {
+            StartShowerheadFill(CurrentPourTargetML - CurrentPourDispensedML);
+            return;
+        }
+
+        if (CurrentPour == 0) {
+            CurrentDispensePhase = DISPENSE_BLOOM_SOAK;
+            DispensePhaseStartTime = millis();
+            Serial.println("[DISPENSE] Bloom complete. Starting bloom soak...");
+            return;
+        }
+
+        if (CurrentPour >= 4) {
+            CurrentDispensePhase = DISPENSE_COMPLETE;
+        } else {
+            CurrentDispensePhase = DISPENSE_PAUSE_BETWEEN_POURS;
+            DispensePhaseStartTime = millis();
+            Serial.println("[DISPENSE] Pour complete. Starting 30 second rest...");
+        }
+    }
+
+    if (CurrentDispensePhase == DISPENSE_BLOOM_SOAK) {
+        if (millis() - DispensePhaseStartTime < BLOOM_SOAK_TIME_MS) {
+            return;
+        }
+
+        if (PourTargetML <= 0.0) {
+            CurrentDispensePhase = DISPENSE_COMPLETE;
+            return;
+        }
+
+        CurrentPour = 1;
+        CurrentPourTargetML = PourTargetML;
+        CurrentPourDispensedML = 0.0;
+        StartShowerheadFill(CurrentPourTargetML);
+        Serial.println("[DISPENSE] Starting regular pour 1 of 4");
+        return;
+    }
+
+    if (CurrentDispensePhase == DISPENSE_PAUSE_BETWEEN_POURS) {
+        if (millis() - DispensePhaseStartTime < PAUSE_BETWEEN_POURS_MS) {
+            return;
+        }
+
+        CurrentPour++;
+        CurrentPourTargetML = PourTargetML;
+        CurrentPourDispensedML = 0.0;
+        StartShowerheadFill(CurrentPourTargetML);
+        Serial.print("[DISPENSE] Starting regular pour ");
+        Serial.print(CurrentPour);
+        Serial.println(" of 4");
+        return;
+    }
+
+    if (CurrentDispensePhase == DISPENSE_COMPLETE) {
         digitalWrite(PUMP_2_PIN, LOW);
         digitalWrite(SOLENOID_PIN, LOW);
         detachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN_2));
-        
-        Serial.println("[DISPENSE] TIMEOUT - Stopping dispense");
-        CurrentState = ERROR;
+
+        StateFlags.DISPENSE_DispensingComplete = true;
+        StateFlags.GENERAL_Initialized = false;
+        // Back to IDLE (was GRIND) so a finished brew reports "IDLE" over
+        // BLE - the app's active-brew screen specifically watches for
+        // status flipping to IDLE right after DISPENSE to show the "Enjoy
+        // your Coffee!" screen. Leaving this as GRIND made the app jump
+        // back to the grinding screen the instant the real coffee finished.
+        CurrentState = IDLE;
         StateStartTime = millis();
-        memset(&StateFlags, 0, sizeof(StateFlags));
-        FlowPulseCount = 0;
-        return;
+
+        Serial.println("[DISPENSE] ========== DISPENSE COMPLETE ==========");
+        Serial.print("[DISPENSE] Target water dispensed: ");
+        Serial.print(TotalDispenseTargetML);
+        Serial.println(" mL");
     }
 }
+
 void HandleERROR(){ //NOT CORRECT CURRENTLY
     // Turn ALL actuators OFF (safety shutdown)
     //digitalWrite(MOTOR_DRIVER_PIN, LOW);
@@ -872,26 +991,34 @@ void HandleERROR(){ //NOT CORRECT CURRENTLY
 void setup() {
     Serial.begin(115200);
     TempSensor.begin();
- //   pinMode(HEATER_PIN, OUTPUT);
-  //  digitalWrite(HEATER_PIN, LOW);
-   // HandleTARE();
-
-   pinMode(SOLENOID_PIN, OUTPUT);
-        pinMode(PUMP_2_PIN, OUTPUT);
-        pinMode(FLOW_SENSOR_PIN_2, INPUT_PULLUP);
-
-   digitalWrite(SOLENOID_PIN, HIGH); // Turn solenoid ON (open valve)
-        delay(500);
-        digitalWrite(PUMP_2_PIN, HIGH);   // Turn PUMP_2 ON
-    
+    pinMode(HEATER_PIN, OUTPUT);
+    digitalWrite(HEATER_PIN, LOW);
+    BleSetup();
+    HandleTARE();
 }
 
-void loop(){  
+void loop(){
 
+    // BLE work deferred from callbacks - see the comment above
+    // BleStatusUpdatePending for why this can't happen inside onWrite/etc.
+    if (BleAdvertisingRestartPending) {
+        BLEDevice::startAdvertising();
+        BleAdvertisingRestartPending = false;
+    }
+    if (BleStatusUpdatePending) {
+        BleSendStatusUpdate();
+        BleStatusUpdatePending = false;
+    }
 
-    /*switch(CurrentState){
+    static unsigned long lastBleNotify = 0;
+    if (pBleServer->getConnectedCount() > 0 && millis() - lastBleNotify > 2000) {
+        BleSendStatusUpdate();
+        lastBleNotify = millis();
+    }
+
+    switch(CurrentState){
         case IDLE:
-            //HandleIDLE();
+            HandleIDLE();
             break;
         case GRIND:
             HandleGRIND();
@@ -903,11 +1030,11 @@ void loop(){
             HandleHEAT();
             break;
         case DISPENSE:
-            //HandleDISPENSE();
+            HandleDISPENSE();
             break;
         case ERROR:
             //HandleERROR();
             break;
     }
-            */
+
 }

@@ -103,3 +103,24 @@ export async function sendMachineCommand(command: string) {
   if (connectionType === "ble") return sendMachineCommandBle(command);
   return sendMachineCommandWifi(command);
 }
+
+// Sends the learned brew settings to the machine as a JSON command, ahead of
+// START_GRIND. There's no hardware for grind coarseness yet (see the
+// handoff doc), so grindSize is intentionally not sent - only what the real
+// machine can actually act on: bean weight, water temp and water volume.
+// Temp is converted F->C because PourProfile.targetTemp is Fahrenheit but
+// the firmware's RecipeData.TargetWaterTemp is Celsius.
+export async function sendRecipeToMachine(recipe: {
+  targetTemp: number;
+  coffeeWeight: number;
+  waterVolume: number;
+}) {
+  const tempC = Math.round(((recipe.targetTemp - 32) * 5) / 9);
+  const payload = JSON.stringify({
+    cmd: "SET_RECIPE",
+    tempC,
+    beanWeight: Math.round(recipe.coffeeWeight),
+    waterWeight: Math.round(recipe.waterVolume),
+  });
+  return sendMachineCommand(payload);
+}

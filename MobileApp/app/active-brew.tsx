@@ -10,7 +10,11 @@ import { useTheme } from "../context/ThemeContext";
 import {
   getMachineStatus,
   sendMachineCommand,
+  sendRecipeToMachine,
 } from "../src/backend/api/machine";
+import { getUserProfiles } from "../src/backend/api/database";
+import { getSessionUser } from "../src/backend/auth/session";
+import { PourProfile } from "../src/models/types";
 import { GradientButton } from "../src/components/auth/AuthControls";
 import BeanConfetti from "../src/components/BeanConfetti";
 import {
@@ -56,6 +60,27 @@ export default function ActiveBrewScreen() {
 
   const [isDisconnected, setIsDisconnected] = useState(false);
   const [hasBeenInterrupted, setHasBeenInterrupted] = useState(false);
+
+  // The full recipe (temp/grind/weight), loaded once so it can be sent to
+  // the machine ahead of START_GRIND. recipeId alone isn't enough - the
+  // machine needs the actual numbers.
+  const [recipe, setRecipe] = useState<PourProfile | null>(null);
+  useEffect(() => {
+    const loadRecipe = async () => {
+      const idStr = recipeId as string | undefined;
+      if (!idStr) return;
+      try {
+        const user = await getSessionUser();
+        if (!user?.sub) return;
+        const profiles = await getUserProfiles(user.sub);
+        const match = profiles.find((p) => p.profileId === idStr);
+        if (match) setRecipe(match);
+      } catch (e) {
+        console.error("[Brew] Failed to load recipe for this brew", e);
+      }
+    };
+    loadRecipe();
+  }, [recipeId]);
 
   // --- Theme tokens ---
   const glass = isDark ? Glass.dark : Glass.light;
@@ -189,6 +214,16 @@ export default function ActiveBrewScreen() {
         console.log(" [Hardware Check] Failed: No cup present.");
         setCurrentStep("ERROR_GRINDER");
       } else {
+        // Send the recipe first so the machine knows what to grind/heat
+        // to, before telling it to actually start.
+        if (recipe) {
+          console.log(" [Action] Sending recipe to machine before START_GRIND.");
+          await sendRecipeToMachine(recipe);
+        } else {
+          console.log(
+            " [Action] No recipe loaded yet - machine will use its own defaults.",
+          );
+        }
         console.log(" [Hardware Check] Passed. Sending START_GRIND command.");
         await sendMachineCommand("START_GRIND");
         setCurrentStep("GRINDING");
